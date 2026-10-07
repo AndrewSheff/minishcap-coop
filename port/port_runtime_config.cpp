@@ -29,6 +29,37 @@ struct Bind {
 
 constexpr Sint16 kAxisThreshold = 16384;
 
+/* Physical key for a keyboard bind. Binds are stored as keycodes, which
+ * follow the active layout: under a Russian layout no key produces 'i', so
+ * SDL_GetScancodeFromKey(SDLK_I) is UNKNOWN and the bind never fires (coop
+ * player 2's I/J/K/L/U/O/H/Y, player 1's X/Z/A/S...). Letters and digits the
+ * layout cannot type fall back to their US-QWERTY position. */
+SDL_Scancode BindScancode(SDL_Keycode key) {
+    if (key == SDLK_UNKNOWN)
+        return SDL_SCANCODE_UNKNOWN;
+    SDL_Scancode sc = SDL_GetScancodeFromKey(key, nullptr);
+    if (sc != SDL_SCANCODE_UNKNOWN)
+        return sc;
+    if (key >= SDLK_A && key <= SDLK_Z)
+        return (SDL_Scancode)(SDL_SCANCODE_A + (key - SDLK_A));
+    if (key >= SDLK_1 && key <= SDLK_9)
+        return (SDL_Scancode)(SDL_SCANCODE_1 + (key - SDLK_1));
+    if (key == SDLK_0)
+        return SDL_SCANCODE_0;
+    return SDL_SCANCODE_UNKNOWN;
+}
+
+/* Does this KEY_DOWN event press the bound key (by keycode, or by physical
+ * position when the layout cannot type the bound character)? */
+bool KeyEventMatches(SDL_Keycode key, const SDL_Event* e) {
+    if (key == SDLK_UNKNOWN)
+        return false;
+    if (key == e->key.key)
+        return true;
+    const SDL_Scancode sc = BindScancode(key);
+    return sc != SDL_SCANCODE_UNKNOWN && sc == e->key.scancode;
+}
+
 struct Def {
     PortInput input;
     const char* name;
@@ -823,8 +854,11 @@ extern "C" void Port_Config_Load(const char* path) {
             v.clear();
         }
         const auto& b2 = j.contains("p2_bindings") && j["p2_bindings"].is_object() ? j["p2_bindings"] : empty;
+        const nlohmann::json p2Defaults = DefaultsJson()["p2_bindings"];
         for (const auto& d : kP2Defaults) {
-            const nlohmann::json& v = b2.contains(d.name) ? b2[d.name] : DefaultsJson()["p2_bindings"][d.name];
+            /* By value: a reference into a temporary DefaultsJson() dangles
+             * past this statement (player 2 then had no keys at all). */
+            const nlohmann::json v = b2.contains(d.name) ? b2[d.name] : p2Defaults[d.name];
             for (const auto& it : (v.is_array() ? v : nlohmann::json::array({ v }))) {
                 if (it.is_string() && it.get<std::string>().rfind("SDLK:", 0) == 0) {
                     Bind kb;
@@ -832,6 +866,13 @@ extern "C" void Port_Config_Load(const char* path) {
                     sBindsP2[d.input].push_back(kb);
                 }
             }
+        }
+        if (getenv("TMC_P2_INPUT_LOG")) {
+            size_t n = 0;
+            for (const auto& v2 : sBindsP2)
+                n += v2.size();
+            fprintf(stderr, "[p2-keys] loaded %zu player-2 key binds (p2_bindings %s)\n", n,
+                    b2.empty() ? "absent: defaults" : "from config");
         }
     };
 
@@ -1445,18 +1486,40 @@ extern "C" void Port_Config_HandleEvent(const SDL_Event* e) {
         CloseGamepad(e->gdevice.which);
         Port_TouchControls_SetGamepadAvailable(!sPads.empty());
     } else if (e->type == SDL_EVENT_KEY_DOWN && !e->key.repeat) {
+        /* ponytail: debug knob — TMC_P2_INPUT_LOG=1 logs every key press with
+         * the P1 / P2 inputs it maps to (layout / binding diagnosis). */
+        static int sKeyLog = -1;
+        if (sKeyLog < 0)
+            sKeyLog = getenv("TMC_P2_INPUT_LOG") != nullptr;
+        if (sKeyLog) {
+            std::string p1, p2;
+            for (size_t i = 0; i < PORT_INPUT_COUNT; i++) {
+                for (const Bind& b : sBinds[i])
+                    if (KeyEventMatches(b.key, e)) {
+                        p1 += std::to_string(i) + " ";
+                        break;
+                    }
+                for (const Bind& b : sBindsP2[i])
+                    if (KeyEventMatches(b.key, e)) {
+                        p2 += std::to_string(i) + " ";
+                        break;
+                    }
+            }
+            fprintf(stderr, "[key] keycode=0x%x scancode=%d -> P1 [%s] P2 [%s]\n", (unsigned)e->key.key,
+                    (int)e->key.scancode, p1.c_str(), p2.c_str());
+        }
         /* Stamp every PortInput whose binding includes this key as
          * "pressed this frame" so the engine sees the press even if
          * the matching release arrives before the next poll. */
         for (size_t i = 0; i < PORT_INPUT_COUNT; i++) {
             for (const Bind& b : sBinds[i]) {
-                if (b.key != SDLK_UNKNOWN && b.key == e->key.key) {
+                if (KeyEventMatches(b.key, e)) {
                     sEdgePressed[i] = true;
                     break;
                 }
             }
             for (const Bind& b : sBindsP2[i]) {
-                if (b.key != SDLK_UNKNOWN && b.key == e->key.key) {
+                if (KeyEventMatches(b.key, e)) {
                     sEdgePressedP2[i] = true;
                     break;
                 }
@@ -1508,13 +1571,25 @@ extern "C" bool Port_Config_InputPressedP2(PortInput input) {
     if (input < 0 || input >= PORT_INPUT_COUNT) {
         return false;
     }
+    {
+        /* TMC_P2_INPUT_LOG: once, how each P2 key resolves under the active
+         * keyboard layout (needs the real video driver for the keymap). */
+        static bool sLogged = false;
+        if (!sLogged && getenv("TMC_P2_INPUT_LOG")) {
+            sLogged = true;
+            for (size_t i = 0; i < PORT_INPUT_COUNT; i++)
+                for (const Bind& b : sBindsP2[i])
+                    fprintf(stderr, "[p2-keys] input %zu keycode=0x%x GetScancodeFromKey=%d BindScancode=%d\n", i,
+                            (unsigned)b.key, (int)SDL_GetScancodeFromKey(b.key, nullptr), (int)BindScancode(b.key));
+        }
+    }
     if (!sConsoleParity && sEdgePressedP2[input]) {
         return true;
     }
     int count = 0;
     const bool* keys = SDL_GetKeyboardState(&count);
     for (const Bind& b : sBindsP2[input]) {
-        SDL_Scancode scan = b.key == SDLK_UNKNOWN ? SDL_SCANCODE_UNKNOWN : SDL_GetScancodeFromKey(b.key, nullptr);
+        SDL_Scancode scan = BindScancode(b.key);
         if (scan != SDL_SCANCODE_UNKNOWN && (int)scan < count && keys[scan]) {
             return true;
         }
@@ -1580,7 +1655,7 @@ extern "C" bool Port_Config_EventIsInputDown(const SDL_Event* e, PortInput input
     }
     if (e->type == SDL_EVENT_KEY_DOWN && !e->key.repeat) {
         for (const Bind& b : sBinds[input]) {
-            if (b.key != SDLK_UNKNOWN && b.key == e->key.key) {
+            if (KeyEventMatches(b.key, e)) {
                 return true;
             }
         }
@@ -1626,7 +1701,7 @@ extern "C" bool Port_Config_InputPressed(PortInput input) {
     int count = 0;
     const bool* keys = SDL_GetKeyboardState(&count);
     for (const Bind& b : sBinds[input]) {
-        SDL_Scancode scan = b.key == SDLK_UNKNOWN ? SDL_SCANCODE_UNKNOWN : SDL_GetScancodeFromKey(b.key, nullptr);
+        SDL_Scancode scan = BindScancode(b.key);
         if (scan != SDL_SCANCODE_UNKNOWN && (int)scan < count && keys[scan]) {
             return true;
         }

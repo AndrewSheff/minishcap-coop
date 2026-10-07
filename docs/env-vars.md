@@ -88,6 +88,7 @@ Warp arguments use the `area,room,x,y,layer` form (C integer literals, so
 | `TMC_TEST_INPUT` | port/port_bios.c | Scripted input: `tick:button[:hold][,...]`, e.g. `600:start,720:r`. Prefix the button with `p2:` for coop player 2: `700:p2:right:30`. |
 | `TMC_COOP_TEST_THEN` | port/port_coop_test.c | **(debug)** `<preset>@<frame>`: jump to a second coop-test preset mid-run (area-change tests). |
 | `TMC_COOP_DEBUG` | port/port_coop.c | **(debug)** Log both players' state every 10 frames. |
+| `TMC_P2_INPUT_LOG` | port/port_runtime_config.cpp | **(debug)** Log how many player-2 key binds loaded, how each resolves to a physical key, and every key press with the P1/P2 inputs it maps to. |
 | `TMC_COOP_NOJOIN` | port/port_coop.c | **(debug)** Don't auto-join player 2 in coop-test mode (it still joins on a P2 button). |
 | `TMC_REPRO_QUICKSAVE_ROUNDTRIP` | port/port_quicksave.c, port/port_repro_npc_talk.c | Quicksave/load round-trip check; boots into a room via the NPC-talk harness **(harness)**. |
 | `TMC_REPRO_QUICKSAVE_FRAMES` | port/port_quicksave.c | Frames to replay for the quicksave round-trip. |
