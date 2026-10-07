@@ -35,6 +35,7 @@
 #include "save.h"
 #include "message.h"
 #include "enemy.h"
+#include "manager.h"
 #include "port_coop.h"
 #include "port_runtime_config.h"
 
@@ -236,6 +237,16 @@ static const Entity* FocusRoot(const Entity* e);
 int Port_Coop_BeginEntityUpdate(void* entity) {
     if (!sP2Active || sCurrent != 0)
         return 0;
+    if (((const Entity*)entity)->kind == MANAGER && ((const Entity*)entity)->id == LIGHT_MANAGER && !sHidden &&
+        P2Linked() && !(gPortPlayerStates[0].flags & PL_USE_LANTERN) &&
+        (gPortPlayerStates[1].flags & PL_USE_LANTERN)) {
+        /* Dark rooms have one light circle (WIN0), drawn around "the
+         * player" with a lit lantern: player 2's when only its lantern is
+         * lit. */
+        sFocusContext = 1;
+        Port_Coop_PushPlayer(1);
+        return PORT_COOP_FOCUS;
+    }
     if (entity == (void*)P2) {
         if (sHidden)
             return PORT_COOP_SKIP_UPDATE; /* put away while player 1 is busy */
@@ -258,6 +269,15 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
             sFocusContext = 1;
             if (ChooseFocus(&root->base, &sFocus[root - gEntities]) == 1)
                 Port_Coop_PushPlayer(1);
+            return PORT_COOP_FOCUS;
+        }
+        if ((!owner || *owner == 0) && !sHidden && g->base.kind == OBJECT && (g->base.contactFlags & CONTACT_NOW) &&
+            Port_Coop_IsPlayer2Entity(g->base.contactedEntity)) {
+            /* A world object player 2's gear touched this frame (gust jar
+             * suction, cane, sword): its "what is the player doing" checks
+             * (gustJarState...) read player 2's state for this update. */
+            sFocusContext = 1;
+            Port_Coop_PushPlayer(1);
             return PORT_COOP_FOCUS;
         }
         if (owner && *owner == 1) {

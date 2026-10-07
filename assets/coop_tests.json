@@ -66,6 +66,22 @@
       "all_items": true,
       "mid_game_flags": true,
       "safe_spawn": true
+    },
+    {
+      "name": "boss-chuchu",
+      "description": "Храм Deepwood, зал босса: Big ChuChu. Босс бьёт и выбирает ближайшего Линка.",
+      "warp": "0x49,0x00,0x80,0xe0,1",
+      "all_items": true,
+      "mid_game_flags": true,
+      "safe_spawn": true
+    },
+    {
+      "name": "boss-gleerok",
+      "description": "Пещера огня, зал босса: Gleerok. Плевки летят в ближайшего Линка; стоять на его теле — только Линк 1.",
+      "warp": "0x51,0x00,0x80,0xe0,1",
+      "all_items": true,
+      "mid_game_flags": true,
+      "safe_spawn": true
     }
   ]
 }
