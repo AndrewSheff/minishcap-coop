@@ -34,6 +34,7 @@
 #include "structures.h"
 #include "save.h"
 #include "message.h"
+#include "enemy.h"
 #include "port_coop.h"
 #include "port_runtime_config.h"
 
@@ -81,6 +82,9 @@ static s16 sP2PrevX, sP2PrevY;       /* player 2's position before its update (l
 /* Owner of each pooled entity: 1 = spawned while player 2 was current. */
 static unsigned char sOwnerEntities[MAX_ENTITIES];
 static unsigned char sOwnerAux[MAX_AUX_PLAYER_ENTITIES];
+/* Enemies: the player each one is busy with (0 / 1, 0xff = not chosen yet). */
+static unsigned char sFocus[MAX_ENTITIES];
+static int sFocusContext; /* an enemy / enemy projectile is updating */
 
 static unsigned char* OwnerSlot(const void* entity) {
     const GenericEntity* g = (const GenericEntity*)entity;
@@ -124,8 +128,13 @@ void Port_Coop_SetP2Keys(unsigned short heldKeys) {
 
 void Port_Coop_OnEntityAppended(void* entity) {
     unsigned char* owner = OwnerSlot(entity);
+    const GenericEntity* g = (const GenericEntity*)entity;
+    /* Spawned by player 2 (sword, arrows...) -> player 2's. Not when an enemy
+     * merely focused on player 2 spawned it: its shots stay the world's. */
     if (owner)
-        *owner = (unsigned char)sCurrent;
+        *owner = (unsigned char)(sFocusContext ? 0 : sCurrent);
+    if (g >= &gEntities[0] && g < &gEntities[MAX_ENTITIES])
+        sFocus[g - gEntities] = 0xff;
 }
 
 /* ---- player-2 context ------------------------------------------------- */
@@ -191,6 +200,10 @@ static void LeaveP2(void) {
     gArea.portal_mode = sSaved.portalMode;
 }
 
+static int P2Linked(void);
+static int ChooseFocus(const Entity* e, unsigned char* focus);
+static int FocusManaged(const Entity* e);
+
 int Port_Coop_BeginEntityUpdate(void* entity) {
     if (!sP2Active || sCurrent != 0)
         return 0;
@@ -207,6 +220,16 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
     }
     {
         unsigned char* owner = OwnerSlot(entity);
+        const GenericEntity* g = (const GenericEntity*)entity;
+        if ((!owner || *owner == 0) && !sHidden && P2Linked() && g >= &gEntities[0] &&
+            g < &gEntities[MAX_ENTITIES] && FocusManaged(&g->base)) {
+            /* An enemy: while it updates, "the player" is the Link it is
+             * busy with — the one it chases, hits, grabs or swallows. */
+            sFocusContext = 1;
+            if (ChooseFocus(&g->base, &sFocus[g - gEntities]) == 1)
+                Port_Coop_PushPlayer(1);
+            return PORT_COOP_FOCUS;
+        }
         if (owner && *owner == 1) {
             /* ...unless player 1 is the one holding it now. */
             int i;
@@ -230,6 +253,15 @@ static int Apart(s32 x, s32 y, s32 limX, s32 limY) {
 }
 
 void Port_Coop_EndEntityUpdate(int token) {
+    if (token == PORT_COOP_FOCUS) {
+        sFocusContext = 0;
+        if (sCurrent != 0)
+            Port_Coop_PopPlayer(0);
+        /* Enemy code may point the camera at "the player": keep it on 1. */
+        if (gRoomControls.camera_target == P2)
+            gRoomControls.camera_target = &gPortPlayerEntities[0].base;
+        return;
+    }
     if (token == 2) {
         /* Leash: player 2's own step may not take it further than a screen
          * from player 1 (it stops at the edge, like a wall). */
@@ -318,8 +350,8 @@ Entity* Port_Coop_PickEnemyTarget(Entity* (*filter)(void)) {
     s32 bestD2 = 0x7fffffff;
     int prev, i;
 
-    if (!sP2Active || sHidden || !P2Linked())
-        return filter();
+    if (!sP2Active || sHidden || !P2Linked() || sFocusContext)
+        return filter(); /* an enemy's focus player decides (EndEntityUpdate) */
     prev = sCurrent;
     for (i = 0; i < PORT_MAX_PLAYERS; i++) {
         Entity* t;
@@ -368,6 +400,53 @@ void Port_Coop_TintP2Palette(unsigned short* colors) {
         if (g > r + 2 && g > b + 2)
             colors[i] = (u16)(g | (r << 5) | (b << 10));
     }
+}
+
+/* ---- enemies that use "the player" directly (stage 4) ------------------- */
+
+/* Can an enemy go after player idx right now? */
+static int Targetable(int idx) {
+    const PlayerState* ps = &gPortPlayerStates[idx];
+    if (idx == 1 && (!sP2Active || sHidden))
+        return 0;
+    return ps->killed == 0 &&
+           !(ps->flags & (PL_DROWNING | PL_USE_PORTAL | PL_HIDDEN | PL_FALLING | PL_IN_HOLE | PL_CLIMBING));
+}
+
+static s32 Dist2(const Entity* a, const Entity* b) {
+    s32 dx = a->x.HALF.HI - b->x.HALF.HI, dy = a->y.HALF.HI - b->y.HALF.HI;
+    return dx * dx + dy * dy;
+}
+
+/* Which player this enemy deals with: sticky while it holds that player
+ * (captured / swallowed / beetles on it), otherwise the nearer one — with a
+ * margin so it doesn't flip-flop between two Links at similar range. */
+static int ChooseFocus(const Entity* e, unsigned char* focus) {
+    int cur = *focus;
+    if (cur > 1 || !Targetable(cur)) {
+        cur = Targetable(0) ? 0 : (Targetable(1) ? 1 : 0);
+    } else {
+        const PlayerState* ps = &gPortPlayerStates[cur];
+        const int held = (ps->flags & (PL_CAPTURED | PL_MOLDWORM_CAPTURED)) || ps->attachedBeetleCount != 0;
+        const int other = 1 - cur;
+        if (!held && Targetable(other) &&
+            Dist2(e, &gPortPlayerEntities[other].base) + 24 * 24 < Dist2(e, &gPortPlayerEntities[cur].base))
+            cur = other;
+    }
+    *focus = (unsigned char)cur;
+    return cur;
+}
+
+/* Non-boss enemies and enemy projectiles follow their focus player. Boss
+ * fights stay player 1's for now. */
+static int FocusManaged(const Entity* e) {
+    if (e->kind == ENEMY)
+        return !(((const Enemy*)e)->enemyFlags & EM_FLAG_BOSS);
+    if (e->kind == PROJECTILE) {
+        const Entity* parent = e->parent;
+        return !(parent != NULL && parent->kind == ENEMY && (((const Enemy*)parent)->enemyFlags & EM_FLAG_BOSS));
+    }
+    return 0;
 }
 
 /* ---- camera (stage 3) ------------------------------------------------- */

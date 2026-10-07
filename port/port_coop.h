@@ -28,6 +28,7 @@ int Port_Coop_IsP2Active(void);
  * collision, back to player 1 after. Returns the token for End;
  * PORT_COOP_SKIP_UPDATE = don't update (or draw) this entity this frame. */
 #define PORT_COOP_SKIP_UPDATE 3
+#define PORT_COOP_FOCUS 4 /* an enemy updating as "focused on" a player */
 int Port_Coop_BeginEntityUpdate(void* entity);
 void Port_Coop_EndEntityUpdate(int token);
 
