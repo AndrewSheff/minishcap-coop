@@ -85,7 +85,7 @@ void UpdateUIElements(void) {
         element = &gHUD.elements[index];
         if (element->used != 0) {
 #ifdef PC_PORT
-            if (element->type > UI_ELEMENT_TEXT_B) {
+            if (element->type > UI_ELEMENT_P2_ITEM_B) {
                 element->used = 0;
                 continue;
             }
@@ -105,7 +105,7 @@ void DrawUIElements(void) {
         element = &gHUD.elements[index];
         if (element->used == 1 && element->unk_0_1 == 1) {
 #ifdef PC_PORT
-            if (element->type > UI_ELEMENT_TEXT_B) {
+            if (element->type > UI_ELEMENT_P2_ITEM_B) {
                 continue;
             }
 #endif
@@ -226,6 +226,12 @@ void InitUI(bool32 keepHealthAndRupees) {
     CreateUIElement(UI_ELEMENT_BUTTON_A, 0);
     CreateUIElement(UI_ELEMENT_EZLONAGSTART, 0);
     CreateUIElement(UI_ELEMENT_HEART, 0);
+#ifdef PC_PORT
+    CreateUIElement(UI_ELEMENT_P2_ITEM_A, 0);
+    CreateUIElement(UI_ELEMENT_P2_ITEM_B, 0);
+    CreateUIElement(UI_ELEMENT_P2_BUTTON_B, 0);
+    CreateUIElement(UI_ELEMENT_P2_BUTTON_A, 0);
+#endif
 }
 
 void RefreshUI(void) {
@@ -944,7 +950,86 @@ void EzloNagUIElement_Action2(UIElement* element) {
  * PC_PORT: UI element definitions use native function pointers,
  * initialized at runtime to avoid being clobbered by MemClear.
  */
-UIElementDefinition gUIElementDefinitions[11];
+UIElementDefinition gUIElementDefinitions[15];
+
+/* Coop player 2's A/B, under the hearts on the left: the game's own button
+ * and item-icon sprites (names nowhere — the pause menu shows those from the
+ * ROM). Item tiles go to the second half of player 2's VRAM slot
+ * (Port_Coop_HudTileBase), so they never collide with player 1's HUD. */
+#define P2_HUD_BUTTON_B_X 0x10
+#define P2_HUD_BUTTON_A_X 0x28
+#define P2_HUD_BUTTON_Y 0x2a
+
+extern int Port_Coop_HudVisible(void);
+extern int Port_Coop_HudTileBase(void);
+extern unsigned char Port_CoopItems_Equipped(int slot);
+
+static int P2HudShown(u32 buttonType) {
+    return Port_Coop_HudVisible() && !((gHUD.hideFlags >> buttonType) & 1) && (gMessage.state & MESSAGE_ACTIVE) == 0;
+}
+
+static void P2ButtonUIElement(UIElement* element) {
+    const u32 isB = element->type == UI_ELEMENT_P2_BUTTON_B;
+    element->unk_0_1 = 0;
+    if (!P2HudShown(isB ? UI_ELEMENT_BUTTON_B : UI_ELEMENT_BUTTON_A))
+        return;
+    element->x = isB ? P2_HUD_BUTTON_B_X : P2_HUD_BUTTON_A_X;
+    element->y = P2_HUD_BUTTON_Y;
+    element->unk_0_1 = 1;
+    sub_0801CAFC(element, isB ? UI_ELEMENT_BUTTON_B : UI_ELEMENT_BUTTON_A); /* same frames as player 1's */
+}
+
+static void P2ItemUIElement(UIElement* element) {
+    const u32 slot = element->type == UI_ELEMENT_P2_ITEM_B;
+    u32 itemId, count, max;
+    s32 base;
+    UIElement* button;
+
+    element->unk_0_1 = 0;
+    if (!P2HudShown(slot ? UI_ELEMENT_BUTTON_B : UI_ELEMENT_BUTTON_A))
+        return;
+    base = Port_Coop_HudTileBase();
+    if (base < 0)
+        return;
+    base += slot ? 8 : 0;
+    if (element->unk_1a != base) {
+        element->unk_1a = base; /* player 2's slot moved: upload again */
+        element->unk_0_2 = element->numTiles != 0;
+    }
+    itemId = Port_CoopItems_Equipped(slot);
+    if (ItemIsBottle(itemId))
+        itemId = gSave.stats.bottles[itemId - ITEM_BOTTLE1];
+    if (itemId == 0 || itemId >= 128)
+        return;
+    if (element->unk_8 != itemId) {
+        element->unk_8 = itemId;
+        sub_0801CAB8(element, gSpriteAnimations_322[itemId]);
+    }
+    switch (itemId) {
+        case ITEM_BOMBS:
+        case ITEM_REMOTE_BOMBS:
+            count = gSave.stats.bombCount;
+            max = gBombBagSizes[gSave.stats.bombBagType];
+            break;
+        case ITEM_BOW:
+        case ITEM_LIGHT_ARROW:
+            count = gSave.stats.arrowCount;
+            max = gQuiverSizes[gSave.stats.quiverType];
+            break;
+        default:
+            count = 0;
+            max = 1;
+            break;
+    }
+    element->unk_18 = max <= count ? 4 : 3; /* full ammo tint, as player 1's */
+    button = FindUIElement(slot ? UI_ELEMENT_P2_BUTTON_B : UI_ELEMENT_P2_BUTTON_A);
+    if (button != NULL && button->unk_0_1) {
+        element->x = button->x;
+        element->y = button->y;
+        element->unk_0_1 = 1;
+        sub_0801CAD0(element);
+    }
+}
 
 void Port_InitUIElementDefinitions(void) {
     const u16 itemSpriteIndex = Port_LogicalSpriteIndex(322);
@@ -971,6 +1056,11 @@ void Port_InitUIElementDefinitions(void) {
     gUIElementDefinitions[9] = (UIElementDefinition){ 0x0000, 0x0000, 0x011A, itemSpriteIndex, TextUIElement, 0, 12, 0, 0 };
     /* [10] UI_ELEMENT_TEXT_B */
     gUIElementDefinitions[10] = (UIElementDefinition){ 0x0000, 0x0000, 0x0126, itemSpriteIndex, TextUIElement, 1, 12, 0, 0 };
+    /* [11..14] coop player 2's buttons and items (tile base set at runtime) */
+    gUIElementDefinitions[11] = (UIElementDefinition){ 0x0000, 0x0000, 0x0100, buttonSpriteIndex, P2ButtonUIElement, 0, 14, 1, 0 };
+    gUIElementDefinitions[12] = (UIElementDefinition){ 0x0000, 0x0000, 0x0100, buttonSpriteIndex, P2ButtonUIElement, 1, 14, 1, 0 };
+    gUIElementDefinitions[13] = (UIElementDefinition){ 0x0000, 0x0000, 0x0000, itemSpriteIndex, P2ItemUIElement, 0, 8, 0, 0 };
+    gUIElementDefinitions[14] = (UIElementDefinition){ 0x0000, 0x0000, 0x0000, itemSpriteIndex, P2ItemUIElement, 1, 8, 0, 0 };
 }
 
 void (*const ButtonUIElement_Actions[])(UIElement*) = {

@@ -19,7 +19,14 @@ typedef enum {
     UI_ELEMENT_EZLONAGSTART,
     UI_ELEMENT_EZLONAGACTIVE,
     UI_ELEMENT_TEXT_A,
-    UI_ELEMENT_TEXT_B
+    UI_ELEMENT_TEXT_B,
+#ifdef PC_PORT
+    /* Coop player 2's A/B (src/ui.c, port/port_coop.c). */
+    UI_ELEMENT_P2_BUTTON_A,
+    UI_ELEMENT_P2_BUTTON_B,
+    UI_ELEMENT_P2_ITEM_A,
+    UI_ELEMENT_P2_ITEM_B,
+#endif
 } UIElementType;
 
 /**
