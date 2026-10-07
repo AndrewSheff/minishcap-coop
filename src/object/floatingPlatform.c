@@ -16,6 +16,29 @@ typedef struct {
     u16 unk70;
 } FloatingPlatformEntity;
 
+#ifdef PC_PORT
+/* Coop: the other Link rides this platform too (port_coop.c). */
+extern int Port_Coop_PushOtherPlayer(void);
+extern void Port_Coop_PopPlayer(int prev);
+extern void Port_Coop_CarryOtherPlayer(int dx, int dy);
+#define COOP_PLATFORM_BEGIN(check)                          \
+    const s16 coopX = super->x.HALF.HI, coopY = super->y.HALF.HI; \
+    int coopOther = 0;                                      \
+    {                                                       \
+        const int prev = Port_Coop_PushOtherPlayer();       \
+        if (prev >= 0) {                                    \
+            coopOther = (check);                            \
+            Port_Coop_PopPlayer(prev);                      \
+        }                                                   \
+    }
+#define COOP_PLATFORM_END()                                 \
+    if (coopOther)                                          \
+        Port_Coop_CarryOtherPlayer(super->x.HALF.HI - coopX, super->y.HALF.HI - coopY);
+#else
+#define COOP_PLATFORM_BEGIN(check)
+#define COOP_PLATFORM_END()
+#endif
+
 void FloatingPlatform_Init(FloatingPlatformEntity*);
 void FloatingPlatform_Action1(FloatingPlatformEntity*);
 bool32 sub_08086168(FloatingPlatformEntity*);
@@ -41,6 +64,7 @@ void FloatingPlatform_Init(FloatingPlatformEntity* this) {
 
 void FloatingPlatform_Action1(FloatingPlatformEntity* this) {
     bool32 iVar2 = sub_08086168(this);
+    COOP_PLATFORM_BEGIN(sub_08086168(this))
 
     if (super->timer != 0 && super->parent->timer == 0) {
 
@@ -54,6 +78,7 @@ void FloatingPlatform_Action1(FloatingPlatformEntity* this) {
     } else {
         SyncPlayerToPlatform(super, FALSE);
     }
+    COOP_PLATFORM_END()
 
     if (--this->unk70 == 0) {
         UpdateRailMovement(super, (u16**)&super->child, &this->unk70);

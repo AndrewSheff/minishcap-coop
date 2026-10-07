@@ -40,6 +40,29 @@ typedef struct {
 static void sub_08097B24(LilypadSmallEntity* this);
 static bool32 CheckMovePlayer(LilypadSmallEntity* this);
 
+#ifdef PC_PORT
+/* Coop: the other Link rides this platform too (port_coop.c). */
+extern int Port_Coop_PushOtherPlayer(void);
+extern void Port_Coop_PopPlayer(int prev);
+extern void Port_Coop_CarryOtherPlayer(int dx, int dy);
+#define COOP_PLATFORM_BEGIN(check)                          \
+    const s16 coopX = super->x.HALF.HI, coopY = super->y.HALF.HI; \
+    int coopOther = 0;                                      \
+    {                                                       \
+        const int prev = Port_Coop_PushOtherPlayer();       \
+        if (prev >= 0) {                                    \
+            coopOther = (check);                            \
+            Port_Coop_PopPlayer(prev);                      \
+        }                                                   \
+    }
+#define COOP_PLATFORM_END()                                 \
+    if (coopOther)                                          \
+        Port_Coop_CarryOtherPlayer(super->x.HALF.HI - coopX, super->y.HALF.HI - coopY);
+#else
+#define COOP_PLATFORM_BEGIN(check)
+#define COOP_PLATFORM_END()
+#endif
+
 void LilypadSmall(LilypadSmallEntity* this) {
     u32 rand;
     u16* psVar4;
@@ -62,7 +85,11 @@ void LilypadSmall(LilypadSmallEntity* this) {
         }
         UpdateRailMovement(super, (u16**)&super->child, &this->unk_70);
     }
-    SyncPlayerToPlatform(super, CheckMovePlayer(this));
+    {
+        COOP_PLATFORM_BEGIN(CheckMovePlayer(this))
+        SyncPlayerToPlatform(super, CheckMovePlayer(this));
+        COOP_PLATFORM_END()
+    }
     sub_08097B24(this);
     psVar4 = &this->unk_70;
     if (--*psVar4 == 0) {

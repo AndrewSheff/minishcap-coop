@@ -431,6 +431,18 @@ int Port_Coop_PushOtherPlayer(void) {
     return Port_Coop_PushPlayer(1 - sCurrent);
 }
 
+/* Moving platforms (floating platforms, small lilypads) carry "the player"
+ * standing on them. They check the other player with Port_Coop_PushOtherPlayer
+ * and move it by the platform's own step here. */
+void Port_Coop_CarryOtherPlayer(int dx, int dy) {
+    Entity* other;
+    if (!sP2Active || sHidden || !P2Linked() || (dx == 0 && dy == 0))
+        return;
+    other = &gPortPlayerEntities[1 - sCurrent].base;
+    other->x.HALF.HI += dx;
+    other->y.HALF.HI += dy;
+}
+
 /* Collision between two entities: run the handler as player 2 when either
  * side is player 2's (its damage, knockback and iframes land on player 2).
  * Returns the token for Port_Coop_EndCollision. */
