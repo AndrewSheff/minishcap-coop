@@ -167,9 +167,11 @@ static void EnterP2(void) {
     gArea.portal_mode = 0;
     gInput = sP2Input;
     SetCurrent(1);
+    Port_CoopItems_Enter(); /* player 2's A/B choice in gSave.stats.equipped */
 }
 
 static void LeaveP2(void) {
+    Port_CoopItems_Leave();
     SetCurrent(0);
     gInput = sSaved.input;
     /* Player code points the camera at "the player" (InitializePlayer, room
@@ -584,6 +586,15 @@ void Port_Coop_FrameTick(void) {
                 COLLISION_ON(p2);
             }
             return;
+        }
+        {
+            /* Player 2's buttons for its next update: L (Y key) + B / A
+             * steps its item slots instead of playing (port_coop_items.c). */
+            static unsigned short sPrevFiltered;
+            const unsigned short held = Port_CoopItems_FilterKeys(sP2Held, (u16)(sP2Held & ~sP2PrevHeld));
+            sP2Input.heldKeys = held;
+            sP2Input.newKeys = (u16)(held & ~sPrevFiltered);
+            sPrevFiltered = held;
         }
         if (sSpawnSettle > 0) {
             sSpawnSettle--;

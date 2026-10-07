@@ -109,6 +109,12 @@ void Port_SoftSlots_Update(void) {
 }
 
 bool Port_SoftSlots_IsBHeld(void) {
+    {
+        /* Player 1's feature: coop player 2 uses its own B item. */
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0)
+            return false;
+    }
     return Port_SoftSlots_GetAssignment(sActiveSlot) != 0;
 }
 
@@ -117,6 +123,12 @@ int Port_SoftSlots_GetActiveSlot(void) {
 }
 
 uint8_t Port_SoftSlots_GetEffectiveBItem(uint8_t saved) {
+    {
+        /* Player 1's feature: coop player 2 uses its own B item. */
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0)
+            return saved;
+    }
     if (sActiveSlot < 0) return saved;
     uint8_t a = Port_SoftSlots_GetAssignment(sActiveSlot);
     return a ? a : saved;

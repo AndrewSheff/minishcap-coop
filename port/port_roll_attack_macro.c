@@ -306,10 +306,22 @@ void Port_RollAttackMacro_Tick(uint16_t* keyinput) {
 }
 
 bool Port_RollAttackMacro_IsBHeld(void) {
+    {
+        /* Player 1's feature: coop player 2 uses its own B item. */
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0)
+            return false;
+    }
     return sSwordOverride;
 }
 
 uint8_t Port_RollAttackMacro_GetEffectiveBItem(uint8_t saved) {
+    {
+        /* Player 1's feature: coop player 2 uses its own B item. */
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0)
+            return saved;
+    }
     if (!sSwordOverride) {
         return saved;
     }

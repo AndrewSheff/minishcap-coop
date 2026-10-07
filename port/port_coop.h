@@ -38,6 +38,12 @@ void Port_Coop_OnEntityAppended(void* entity);
 /* 0 = player 1, 1 = player 2. */
 int Port_Coop_CurrentPlayer(void);
 
+/* Player 2's own A/B items (port_coop_items.c). */
+unsigned short Port_CoopItems_FilterKeys(unsigned short held, unsigned short newKeys);
+void Port_CoopItems_Enter(void);
+void Port_CoopItems_Leave(void);
+unsigned char Port_CoopItems_Equipped(int slot);
+
 /* Stage 2 — the world sees player 2. */
 int Port_Coop_IsPlayer2Entity(const void* entity);
 int Port_Coop_PushPlayer(int idx);
