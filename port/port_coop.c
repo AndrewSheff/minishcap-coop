@@ -292,15 +292,6 @@ void Port_Coop_FrameTick(void) {
                 gInput.heldKeys, ps->direction, (unsigned)ps->flags, e->updatePriority, gPriorityHandler.event_priority,
                 gPriorityHandler.ent_priority, (unsigned)gMessage.state, e->speed, e->direction, (int)e->z.HALF.HI,
                 (unsigned)ps->animation, e->knockbackDuration);
-        {
-            int tx = (e->x.HALF.HI - gRoomControls.origin_x) >> 4, ty = (e->y.HALF.HI - gRoomControls.origin_y) >> 4;
-            fprintf(stderr, "[coop-dbg]   p1 layer=%u tile=(%d,%d) col here=%u up=%u right=%u left=%u room=%ux%u\n",
-                    e->collisionLayer, tx, ty, (unsigned)GetCollisionDataAtTilePos((u32)(tx | (ty << 6)), e->collisionLayer),
-                    (unsigned)GetCollisionDataAtTilePos((u32)(tx | ((ty - 1) << 6)), e->collisionLayer),
-                    (unsigned)GetCollisionDataAtTilePos((u32)((tx + 1) | (ty << 6)), e->collisionLayer),
-                    (unsigned)GetCollisionDataAtTilePos((u32)((tx - 1) | (ty << 6)), e->collisionLayer),
-                    gRoomControls.width, gRoomControls.height);
-        }
     }
     if (getenv("TMC_COOP_DEBUG") && (gMain.ticks % 10) == 0 && sP2Active) {
         const Entity* e = P2;
