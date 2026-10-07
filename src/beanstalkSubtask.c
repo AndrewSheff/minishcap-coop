@@ -410,16 +410,12 @@ u32 UpdatePlayerCollision(void) {
 
 #ifdef PC_PORT
     {
-        /* Coop: signs, small chests, keyed doors and minish portals are
-         * player 1's (port_coop.c); player 2 walks past them. */
+        /* Coop: minish portals are player 1's (both shrink together,
+         * port_coop.c); player 2 walks past them. Signs, small chests and
+         * keyed doors work for player 2 as for player 1. */
         extern int Port_Coop_CurrentPlayer(void);
         if (Port_Coop_CurrentPlayer() != 0) {
             switch (direction) {
-                case ACT_TILE_58:
-                case ACT_TILE_91:
-                case SPECIAL_TILE_81:
-                case ACT_TILE_26:
-                case ACT_TILE_113:
                 case ACT_TILE_61:
                 case SPECIAL_TILE_64 ... SPECIAL_TILE_72:
                     return 0;

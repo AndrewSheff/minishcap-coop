@@ -36,6 +36,7 @@
 #include "message.h"
 #include "enemy.h"
 #include "manager.h"
+#include "object.h"
 #include "port_coop.h"
 #include "port_runtime_config.h"
 
@@ -200,6 +201,7 @@ typedef struct {
 
 static SavedP1 sSaved;
 static int sP2Rescue; /* bring player 2 back to player 1 at the next FrameTick */
+static int sLeaveIsPlayer; /* the update ending is player 2's own (not an object it owns) */
 
 static void CancelP2Exit(u8 wasTransitioning, const PlayerRoomStatus* status);
 
@@ -259,12 +261,14 @@ static void LeaveP2(void) {
     gSave.stats.picolyteTimer = sSaved.picolyteTimer;
     /* Undo freezes player 2 raised; a freeze it ends (an event it takes
      * part in finishing) stays ended. */
-    if (gPriorityHandler.event_priority > sSaved.eventPriority)
-        gPriorityHandler.event_priority = sSaved.eventPriority;
+    if (gPriorityHandler.event_priority > sSaved.eventPriority &&
+        gPortPlayerEntities[1].base.updatePriority < gPriorityHandler.event_priority)
+        gPriorityHandler.event_priority = sSaved.eventPriority; /* kept when player 2 takes part (item get) */
     if (gPriorityHandler.ent_priority > sSaved.entPriority)
         gPriorityHandler.ent_priority = sSaved.entPriority;
     gArea.portal_mode = sSaved.portalMode;
-    CancelP2Exit(sSaved.transitioningOut, &sSaved.playerStatus);
+    if (sLeaveIsPlayer)
+        CancelP2Exit(sSaved.transitioningOut, &sSaved.playerStatus);
 }
 
 static int P2Linked(void);
@@ -313,8 +317,10 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
             Port_Coop_IsPlayer2Entity(g->base.contactedEntity)) {
             /* A world object player 2's gear touched this frame (gust jar
              * suction, cane, sword): its "what is the player doing" checks
-             * (gustJarState...) read player 2's state for this update. */
-            sFocusContext = 1;
+             * (gustJarState...) read player 2's state for this update. A
+             * pickup touched by player 2 is player 2's to collect: what it
+             * spawns (the item-get scene) is player 2's too. */
+            sFocusContext = g->base.id != GROUND_ITEM;
             FocusOnP2();
             return PORT_COOP_FOCUS;
         }
@@ -374,8 +380,10 @@ void Port_Coop_EndEntityUpdate(int token) {
                 *owner = 1;
         }
     }
-    if (token)
+    if (token) {
+        sLeaveIsPlayer = token == 2;
         LeaveP2();
+    }
 }
 
 /* GameMain_Update calls CheckInitPauseMenu() once a frame from the game
@@ -388,6 +396,7 @@ int Port_Coop_CheckPauseMenuP2(void) {
         return 0;
     EnterP2();
     opened = CheckInitPauseMenu(); /* opens in player 2 mode (port_coop_items.c) */
+    sLeaveIsPlayer = 1;
     LeaveP2();
     return opened;
 }
@@ -429,6 +438,42 @@ int Port_Coop_PushOtherPlayer(void) {
     if (!sP2Active || sHidden || !P2Linked())
         return -1;
     return Port_Coop_PushPlayer(1 - sCurrent);
+}
+
+/* playerUtils.c: a player started an interaction (talk, open, use key).
+ * Objects (chests, big-key doors...) then update as that player's, so an
+ * item-get scene plays on the Link who opened them. NPCs keep running with
+ * player 1 as "the player": their scripts may move it or start story
+ * cutscenes, which stay player 1's; player 2 only starts the talk. */
+void Port_Coop_OnInteract(Entity* entity) {
+    unsigned char* owner = OwnerSlot(entity);
+    if (owner == NULL || sFocusContext)
+        return;
+    *owner = (unsigned char)(entity->kind == NPC ? 0 : sCurrent);
+}
+
+/* Interaction candidates live in one world list (player 1's storage,
+ * playerUtils.c WORLD_INTERACTIONS); player 2 reads its own copy, refreshed
+ * every frame. Kinstone fusion and shop items stay player 1's. */
+static void MirrorInteractions(void) {
+    PossibleInteraction* p2 = &gPortPossibleInteractions[1];
+    int i;
+    memcpy(p2->candidates, gPortPossibleInteractions[0].candidates, sizeof(p2->candidates));
+    for (i = 0; i < (int)(sizeof(p2->candidates) / sizeof(p2->candidates[0])); i++) {
+        p2->candidates[i].kinstoneId = 0;
+        if (p2->candidates[i].type == INTERACTION_LIFT_SHOP_ITEM)
+            p2->candidates[i].type = INTERACTION_NONE;
+    }
+}
+
+int Port_Coop_P2InPlay(void) {
+    return sP2Active && !sHidden;
+}
+
+/* A text box is open while player 2 plays: either player's buttons advance
+ * it (port_bios.c), whoever started the talk. */
+int Port_Coop_TextBoxShared(void) {
+    return sP2Active && (gMessage.state & MESSAGE_ACTIVE) != 0;
 }
 
 /* Moving platforms (floating platforms, small lilypads) carry "the player"
@@ -698,6 +743,7 @@ static void SpawnP2As(int minish) {
     sP2Input = (Input){ 0 };
     EnterP2();
     InitializePlayer(); /* the game's own player spawn, against player 2's storage */
+    sLeaveIsPlayer = 0;
     LeaveP2();
     /* InitializePlayer re-rooted the player hitbox list on player 2. */
     RegisterPlayerHitbox();
@@ -811,6 +857,7 @@ void Port_Coop_FrameTick(void) {
         return;
     }
 
+    MirrorInteractions();
     if (!P2Linked() || sP2Rescue) {
         /* An area load erased the entity lists (and player 2 with them), or
          * player 2 tried to leave the room on its own (CancelP2Exit). */
@@ -828,7 +875,9 @@ void Port_Coop_FrameTick(void) {
         Entity* p2 = P2;
         /* Player 1 is in a cutscene, dialogue, item get, portal, transition:
          * player 2 is put away (not updated, drawn or hit) until it ends. */
-        const int busy = p1s->controlMode != CONTROL_ENABLED || (gMessage.state & MESSAGE_ACTIVE) ||
+        /* (A plain dialogue is not on the list: both Links stay on screen,
+         * frozen by the message box.) */
+        const int busy = p1s->controlMode != CONTROL_ENABLED ||
                          gPriorityHandler.event_priority != 0 || (p1s->flags & (PL_USE_PORTAL | PL_IN_MINECART)) ||
                          (p1->action != PLAYER_NORMAL && p1->action != PLAYER_MINISH && p1->action != PLAYER_ROLL &&
                           p1->action != PLAYER_JUMP && p1->action != PLAYER_PUSH && p1->action != PLAYER_PULL &&

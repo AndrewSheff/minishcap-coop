@@ -1316,6 +1316,13 @@ bool32 sub_080782C0(void) {
         case INTERACTION_TALK_MINISH:
             entity->interactType = INTERACTION_TALK;
             gPossibleInteraction.kinstoneId = KINSTONE_NONE;
+#ifdef PC_PORT
+            {
+                /* Coop: who started it (port_coop.c). */
+                extern void Port_Coop_OnInteract(Entity* entity);
+                Port_Coop_OnInteract(entity);
+            }
+#endif
             return TRUE;
         case INTERACTION_LIFT_SHOP_ITEM:
             if (gRoomVars.shopItemType == 0) {
@@ -1481,6 +1488,15 @@ InteractableObject* sub_080784E4(void) {
     return gPossibleInteraction.currentObject;
 }
 
+#ifdef PC_PORT
+/* Coop: objects register as interaction candidates in one world list (player
+ * 1's storage); port_coop.c copies it to player 2's list every frame. */
+extern PossibleInteraction gPortPossibleInteractions[PORT_MAX_PLAYERS];
+#define WORLD_INTERACTIONS gPortPossibleInteractions[0]
+#else
+#define WORLD_INTERACTIONS gPossibleInteraction
+#endif
+
 void AddInteractableWhenBigObject(Entity* ent) {
     AddInteractableObject(ent, 1, 0);
 }
@@ -1518,7 +1534,7 @@ s32 AddInteractableShopItem(Entity* ent) {
 
     iVar1 = AddInteractableObject(ent, 8, 0);
     if (iVar1 >= 0) {
-        gPossibleInteraction.candidates[iVar1].interactDirections = 0xbe;
+        WORLD_INTERACTIONS.candidates[iVar1].interactDirections = 0xbe;
     }
     return iVar1;
 }
@@ -1530,7 +1546,7 @@ s32 AddInteractableBossDoor(Entity* ent) {
     if (iVar1 >= 0) {
         // weird, this line assumes it's a north door, and is unnecessary
         // anyway because this is overwritten right after returning
-        gPossibleInteraction.candidates[iVar1].interactDirections = 0xbe;
+        WORLD_INTERACTIONS.candidates[iVar1].interactDirections = 0xbe;
     }
     return iVar1;
 }
@@ -1540,7 +1556,7 @@ s32 AddInteractableChest(Entity* ent) {
 
     iVar1 = AddInteractableObject(ent, 3, 0);
     if (iVar1 >= 0) {
-        gPossibleInteraction.candidates[iVar1].interactDirections = 0xbe;
+        WORLD_INTERACTIONS.candidates[iVar1].interactDirections = 0xbe;
     }
     return iVar1;
 }
@@ -1550,9 +1566,9 @@ void SetInteractableObjectCollision(Entity* arg0, u32 ignoreLayer, u32 interactD
 
     iVar1 = GetInteractableObjectIndex(arg0);
     if (iVar1 >= 0) {
-        gPossibleInteraction.candidates[iVar1].ignoreLayer = ignoreLayer;
-        gPossibleInteraction.candidates[iVar1].interactDirections = interactDirections;
-        gPossibleInteraction.candidates[iVar1].customHitbox = customHitbox;
+        WORLD_INTERACTIONS.candidates[iVar1].ignoreLayer = ignoreLayer;
+        WORLD_INTERACTIONS.candidates[iVar1].interactDirections = interactDirections;
+        WORLD_INTERACTIONS.candidates[iVar1].customHitbox = customHitbox;
     }
 }
 
@@ -1564,9 +1580,9 @@ s32 AddInteractableObject(Entity* entity, InteractionType type, KinstoneId kinst
         index = GetInteractableObjectIndex(0);
     }
     if (index >= 0) {
-        gPossibleInteraction.candidates[index].entity = entity;
-        gPossibleInteraction.candidates[index].type = type;
-        gPossibleInteraction.candidates[index].kinstoneId = kinstoneId;
+        WORLD_INTERACTIONS.candidates[index].entity = entity;
+        WORLD_INTERACTIONS.candidates[index].type = type;
+        WORLD_INTERACTIONS.candidates[index].kinstoneId = kinstoneId;
     }
     if (kinstoneId != KINSTONE_NONE) {
         Entity* entity = FindEntityByID(OBJECT, CAMERA_TARGET, 6);
@@ -1581,7 +1597,7 @@ s32 AddInteractableObject(Entity* entity, InteractionType type, KinstoneId kinst
 void RemoveInteractableObject(Entity* entity) {
     s32 index = GetInteractableObjectIndex(entity);
     if (index > -1) {
-        MemClear(&gPossibleInteraction.candidates[index], sizeof(InteractableObject));
+        MemClear(&WORLD_INTERACTIONS.candidates[index], sizeof(InteractableObject));
     }
 }
 
@@ -1589,7 +1605,7 @@ void RemoveInteractableObject(Entity* entity) {
 s32 GetInteractableObjectIndex(Entity* entity) {
     u32 index;
     for (index = 0; index < 0x20; index++) {
-        if (entity == gPossibleInteraction.candidates[index].entity) {
+        if (entity == WORLD_INTERACTIONS.candidates[index].entity) {
             return index;
         }
     }
