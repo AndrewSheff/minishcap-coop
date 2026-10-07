@@ -1,0 +1,47 @@
+{
+  "_comment": "Coop-test presets. Run: TMC_COOP_TEST=<name> ./tmc_pc. warp = area,room,x,y,layer (room-relative pixels, 0x-hex ok; layer 1 = bottom, 2 = top). all_items / mid_game_flags default to true.",
+  "presets": [
+    {
+      "name": "enemies",
+      "description": "Deepwood Shrine, Pillars room: six Sluggulas around the pillars. Combat, hit/knockback, enemy aggro.",
+      "warp": "0x48,0x09,0x88,0xc0,1",
+      "all_items": true,
+      "mid_game_flags": true
+    },
+    {
+      "name": "buttons",
+      "description": "Deepwood Shrine, Button room: a floor button next to Link. Stepping on / off it.",
+      "warp": "0x48,0x07,0x58,0xc8,1",
+      "all_items": true,
+      "mid_game_flags": true
+    },
+    {
+      "name": "push",
+      "description": "Deepwood Shrine, Double Statue room: pushable statue blocks around a floor plate. Pushing / pulling objects.",
+      "warp": "0x48,0x04,0x88,0x88,1",
+      "all_items": true,
+      "mid_game_flags": true
+    },
+    {
+      "name": "transition",
+      "description": "Deepwood Shrine, Mulldozer room: Link stands at the open south doorway. Walk down into the Pillars room (room-to-room transition).",
+      "warp": "0x48,0x08,0x88,0xa0,1",
+      "all_items": true,
+      "mid_game_flags": true
+    },
+    {
+      "name": "portal",
+      "description": "Western Woods South (Hyrule Field): Link just below a Minish portal stump. Walk up onto it and press R to shrink.",
+      "warp": "0x03,0x00,0x78,0xa0,1",
+      "all_items": true,
+      "mid_game_flags": true
+    },
+    {
+      "name": "npc",
+      "description": "Link's house, ground floor: Smith is in the room. Walk up and talk (A / R) to open a dialogue.",
+      "warp": "0x22,0x11,0x78,0x88,1",
+      "all_items": true,
+      "mid_game_flags": true
+    }
+  ]
+}

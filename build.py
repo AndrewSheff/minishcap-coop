@@ -480,6 +480,18 @@ def stage_rando_logic(dist_dir: Path) -> None:
     shutil.copy2(source, target)
     ok(f"default.logic → {target.relative_to(REPO_ROOT)}")
 
+def stage_coop_tests(dist_dir: Path) -> None:
+    """Ship the coop-test presets (TMC_COOP_TEST); keep a newer local copy."""
+    source = REPO_ROOT / "assets" / "coop_tests.json"
+    target = dist_dir / "coop_tests.json"
+    if not source.is_file():
+        return
+    if target.exists() and target.stat().st_mtime > source.stat().st_mtime:
+        info(f"Keeping newer {target.relative_to(REPO_ROOT)}")
+        return
+    shutil.copy2(source, target)
+    ok(f"coop_tests.json → {target.relative_to(REPO_ROOT)}")
+
 def build_version(version: str, env: dict, non_interactive: bool = False,
                   slim: bool = False, multi_region: bool = True) -> Optional[Path]:
     """Build tmc_pc for `version` and stage it under dist/<version>/.
@@ -675,6 +687,7 @@ def build_version(version: str, env: dict, non_interactive: bool = False,
         # the embedded sounds.json fallback (compiled into the
         # binary by tools/generate_sounds_embed.py) handles audio.
         stage_rando_logic(dist_dir)
+        stage_coop_tests(dist_dir)
         info("Slim mode — ROM assets/, assets_src/, and sounds.json are NOT copied.")
         info("tmc_pc will self-extract assets on first launch using the embedded extractor.")
         return dst_bin
@@ -700,6 +713,7 @@ def build_version(version: str, env: dict, non_interactive: bool = False,
         if rando_backup.is_dir():
             shutil.copytree(rando_backup, rando_dst, dirs_exist_ok=True)
     stage_rando_logic(dist_dir)
+    stage_coop_tests(dist_dir)
 
     sounds_src = REPO_ROOT / "assets" / "sounds.json"
     if sounds_src.exists():

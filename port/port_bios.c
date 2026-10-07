@@ -29,6 +29,7 @@
 #include <math.h>
 #include <setjmp.h>
 #include "port_repro.h"
+#include "port_coop_test.h"
 
 static bool gQuitRequested = false;
 static bool sFastForward = false;
@@ -115,6 +116,10 @@ static void Port_UpdateInput(void) {
      * marker file, for Android). Walks to the nearest NPC and stamps R
      * through the real input path; PASS = message box opens. */
     { Port_ReproNpcTalk_Tick(sFrameNum); }
+
+    /* Coop-test quick start (TMC_COOP_TEST=<preset>, or the F8 Coop Test
+     * tab): boots past title / file select into a preset room. */
+    { Port_CoopTest_Tick(sFrameNum); }
 
     /* Item-get perf repro (TMC_REPRO_ITEMGET / "repro_itemget" marker):
      * boots into the forge, settles a baseline profiler window, then fires

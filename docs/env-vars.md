@@ -84,6 +84,7 @@ Warp arguments use the `area,room,x,y,layer` form (C integer literals, so
 |---|---|---|
 | `TMC_CAPTURE_FRAME` | port/port_bios.c | Frame number at which to save a PNG and exit (needs `TMC_CAPTURE_OUT`). |
 | `TMC_CAPTURE_OUT` | port/port_bios.c | Output PNG path for `TMC_CAPTURE_FRAME`. |
+| `TMC_COOP_TEST` | port/port_coop_test.c | Boot straight into a named preset from `coop_tests.json` (next to the binary; source `assets/coop_tests.json`), skipping the prelaunch menu, title and file select, with a mid-game in-memory save. Unknown name = normal start + preset list on stderr. Also an F8 **Coop Test** tab. |
 | `TMC_TEST_INPUT` | port/port_bios.c | Scripted input: `tick:button[,tick:button...]`, e.g. `600:start,720:r`. |
 | `TMC_REPRO_QUICKSAVE_ROUNDTRIP` | port/port_quicksave.c, port/port_repro_npc_talk.c | Quicksave/load round-trip check; boots into a room via the NPC-talk harness **(harness)**. |
 | `TMC_REPRO_QUICKSAVE_FRAMES` | port/port_quicksave.c | Frames to replay for the quicksave round-trip. |

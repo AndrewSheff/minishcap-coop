@@ -38,6 +38,7 @@ extern "C" int Port_GlslpRuntime_IsActive(void);
 #endif
 
 #include "port_debug_query.h"
+#include "port_coop_test.h"
 #include "port_debug_actions.h"
 #include "port_runtime_config.h" /* PortInput enum (PORT_INPUT_*) */
 #include "item_ids.h"            /* ITEM_* / BOTTLE_CHARM_* enum ids (C++-safe split header) */
@@ -592,6 +593,7 @@ static bool DrawRegionLanguageControls(bool prelaunch) {
 #include "port_imgui_equip_tab.inc"
 
 #include "port_imgui_warp_tab.inc"
+#include "port_imgui_coop_test_tab.inc"
 
 #include "port_imgui_randomizer_tab.inc"
 
@@ -661,6 +663,10 @@ static void DrawRibbon(void) {
             }
             if (ImGui::BeginTabItem("Warp")) {
                 DrawRibbonWarpTab();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Coop Test")) {
+                DrawRibbonCoopTestTab();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Entities")) {

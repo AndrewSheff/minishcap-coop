@@ -718,8 +718,8 @@ int main(int argc, char* argv[]) {
         }
 
         bool done = false;
-        if (romPath && getenv("TMC_AUTOPLAY")) {
-            fprintf(stderr, "Prelaunch: TMC_AUTOPLAY set — skipping menu.\n");
+        if (romPath && (getenv("TMC_AUTOPLAY") || getenv("TMC_COOP_TEST"))) {
+            fprintf(stderr, "Prelaunch: TMC_AUTOPLAY/TMC_COOP_TEST set — skipping menu.\n");
             done = true;
         }
         /* Deadline pacing keeps the prelaunch menu near 60 Hz without
