@@ -224,8 +224,12 @@ static void LeaveP2(void) {
     gSave.stats.picolyteType = sSaved.picolyteType;
     gSave.stats.charmTimer = sSaved.charmTimer;
     gSave.stats.picolyteTimer = sSaved.picolyteTimer;
-    gPriorityHandler.event_priority = sSaved.eventPriority;
-    gPriorityHandler.ent_priority = sSaved.entPriority;
+    /* Undo freezes player 2 raised; a freeze it ends (an event it takes
+     * part in finishing) stays ended. */
+    if (gPriorityHandler.event_priority > sSaved.eventPriority)
+        gPriorityHandler.event_priority = sSaved.eventPriority;
+    if (gPriorityHandler.ent_priority > sSaved.entPriority)
+        gPriorityHandler.ent_priority = sSaved.entPriority;
     gArea.portal_mode = sSaved.portalMode;
 }
 
@@ -759,7 +763,12 @@ void Port_Coop_FrameTick(void) {
                          (p1->action != PLAYER_NORMAL && p1->action != PLAYER_MINISH && p1->action != PLAYER_ROLL &&
                           p1->action != PLAYER_JUMP && p1->action != PLAYER_PUSH && p1->action != PLAYER_PULL &&
                           p1->action != PLAYER_BOUNCE);
-        if (busy) {
+        /* ...unless player 2 is the one taking part in the event (its update
+         * priority raised for it): putting it away would leave the event
+         * waiting on it forever. */
+        const int p2InEvent = !sHidden && p2->updatePriority > PRIO_PLAYER &&
+                              p2->updatePriority >= gPriorityHandler.event_priority;
+        if (busy && !p2InEvent) {
             if (!sHidden) {
                 sHidden = 1;
                 sHiddenDraw = p2->spriteSettings.draw;

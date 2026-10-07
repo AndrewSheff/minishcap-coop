@@ -78,6 +78,7 @@ void ItemOnGround(ItemOnGroundEntity* this) {
          * items with an item-get scene are left for player 1. */
         extern int Port_Coop_IsPlayer2Entity(const void* entity);
         if ((super->contactFlags & CONTACT_NOW) && Port_Coop_IsPlayer2Entity(super->contactedEntity) &&
+            super->type != 0x5F /* recovery heart: never an item-get scene (sub_08081598) */ &&
             CheckShouldPlayItemGetCutscene(this)) {
             super->contactFlags = 0;
         }
