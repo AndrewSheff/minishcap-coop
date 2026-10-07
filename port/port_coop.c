@@ -207,11 +207,17 @@ typedef struct {
      * cancelled and player 2 is brought back to player 1 instead. */
     u8 transitioningOut;
     PlayerRoomStatus playerStatus;
+    /* Separate hearts: player 2's death sequence ends in the game over
+     * request (no fairy in a bottle, player.c sub_08071D04); cancelled
+     * here and turned into a knock-out (Port_Coop_FrameTick). */
+    u8 gameOver;
 } SavedP1;
 
 static SavedP1 sSaved;
 static int sP2Rescue; /* bring player 2 back to player 1 at the next FrameTick */
 static int sLeaveIsPlayer; /* the update ending is player 2's own (not an object it owns) */
+static int sP2KnockOut;    /* player 2's death sequence ended without a fairy */
+static int SeparateHearts(void);
 
 static void CancelP2Exit(u8 wasTransitioning, const PlayerRoomStatus* status);
 
@@ -246,6 +252,7 @@ static void EnterP2(void) {
     sSaved.entPriority = gPriorityHandler.ent_priority;
     sSaved.portalMode = gArea.portal_mode;
     sSaved.transitioningOut = gRoomTransition.transitioningOut;
+    sSaved.gameOver = gRoomTransition.field_0x4[1];
     sSaved.playerStatus = gRoomTransition.player_status;
     gArea.portal_mode = 0;
     gInput = sP2Input;
@@ -277,6 +284,10 @@ static void LeaveP2(void) {
     if (gPriorityHandler.ent_priority > sSaved.entPriority)
         gPriorityHandler.ent_priority = sSaved.entPriority;
     gArea.portal_mode = sSaved.portalMode;
+    if (!sSaved.gameOver && gRoomTransition.field_0x4[1] && SeparateHearts()) {
+        gRoomTransition.field_0x4[1] = 0;
+        sP2KnockOut = 1;
+    }
     if (sLeaveIsPlayer)
         CancelP2Exit(sSaved.transitioningOut, &sSaved.playerStatus);
 }
@@ -474,6 +485,39 @@ static void MirrorInteractions(void) {
         if (p2->candidates[i].type == INTERACTION_LIFT_SHOP_ITEM)
             p2->candidates[i].type = INTERACTION_NONE;
     }
+}
+
+/* Dark rooms (lightManager.c): one light circle. With both lanterns lit it
+ * is centred between the Links and widened by half their distance. */
+void Port_Coop_LightCircle(s32* x, s32* y, s32* radius) {
+    /* The circle's row profile (sub_0801E24C) is built for one radius; a
+     * widened circle rebuilds it, and so does the first normal frame after. */
+    extern void sub_0801E24C(s32 radius, s32 offset);
+    static int sWidened;
+    const Entity* other;
+    s32 ox, oy, dx, dy, adx, ady;
+    if (!sP2Active || sHidden || !P2Linked() || !(gPortPlayerStates[0].flags & PL_USE_LANTERN) ||
+        !(gPortPlayerStates[1].flags & PL_USE_LANTERN)) {
+        if (sWidened) {
+            sWidened = 0;
+            sub_0801E24C(*radius, 0);
+        }
+        return;
+    }
+    other = &gPortPlayerEntities[1 - sCurrent].base;
+    ox = other->x.HALF.HI - gRoomControls.scroll_x;
+    oy = other->y.HALF.HI - gRoomControls.scroll_y - 9 + other->z.HALF.HI;
+    dx = ox - *x;
+    dy = oy - *y;
+    adx = dx < 0 ? -dx : dx;
+    ady = dy < 0 ? -dy : dy;
+    *x += dx / 2;
+    *y += dy / 2;
+    *radius += (adx > ady ? adx + ady / 2 : ady + adx / 2) / 2; /* ~half the distance */
+    if (*radius > 0xa0)
+        *radius = 0xa0;
+    sub_0801E24C(*radius, 0);
+    sWidened = 1;
 }
 
 /* HUD (src/ui.c): player 2's own health, when hearts are separate. */
@@ -914,7 +958,11 @@ void Port_Coop_FrameTick(void) {
             }
             return;
         }
-        if (gPortCoopState.health[1] == 0) {
+        /* Player 2's own death sequence plays first (a fairy in a bottle
+         * revives it, as for player 1); with no fairy its game-over request
+         * is cancelled (LeaveP2) and it is knocked out here. */
+        if (sP2KnockOut) {
+            sP2KnockOut = 0;
             gPortCoopState.koTimer = 180;
             sHidden = 1;
             sHiddenDraw = 1;

@@ -192,6 +192,27 @@ static void DrawHeartsP2(void) {
     quarters = hp / 2;
     if (quarters > max)
         quarters = max;
+    {
+        /* Fill one quarter every other frame with the heart sound, drain one
+         * a frame — DrawHearts' own pace for player 1. */
+        static s32 sShown = -1;
+        static u8 sTick;
+        if (sShown < 0 || !shown) {
+            sShown = quarters;
+        } else if (sShown < quarters) {
+            if ((sTick++ & 1) == 0) {
+                if ((sTick & 7) == 1)
+                    SoundReq(SFX_HEART_GET);
+                sShown++;
+            }
+        } else if (sShown > quarters) {
+            sShown--;
+            sTick = 0;
+        } else {
+            sTick = 0;
+        }
+        quarters = sShown;
+    }
     full = quarters / 4;
     /* Written every frame (compared first): other code clears the HUD layer
      * (room loads, hidden HUD), and this redraws on the next frame. */

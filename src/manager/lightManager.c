@@ -94,9 +94,22 @@ void LightManager_Main(LightManager* this) {
         }
 
         super->timer = uVar3;
+#ifdef PC_PORT
+        {
+            /* Coop: both lanterns lit — the one light circle (WIN0) widens to
+             * cover both Links (port_coop.c). */
+            extern void Port_Coop_LightCircle(s32* x, s32* y, s32* radius);
+            s32 lx = gPlayerEntity.base.x.HALF.HI - gRoomControls.scroll_x;
+            s32 ly = gPlayerEntity.base.y.HALF.HI - gRoomControls.scroll_y - 9 + gPlayerEntity.base.z.HALF.HI;
+            s32 lr = uVar3 + this->unk20;
+            Port_Coop_LightCircle(&lx, &ly, &lr);
+            sub_0801E160(lx, ly, lr);
+        }
+#else
         sub_0801E160(gPlayerEntity.base.x.HALF.HI - gRoomControls.scroll_x,
                      gPlayerEntity.base.y.HALF.HI - gRoomControls.scroll_y - 9 + gPlayerEntity.base.z.HALF.HI,
                      uVar3 + this->unk20);
+#endif
     }
 }
 
