@@ -72,6 +72,17 @@ void ItemOnGround(ItemOnGroundEntity* this) {
     static void (*const ItemOnGround_Actions[])(ItemOnGroundEntity*) = {
         ItemOnGround_Init, ItemOnGround_Action1, ItemOnGround_Action2, ItemOnGround_Action3, ItemOnGround_Action4,
     };
+#ifdef PC_PORT
+    {
+        /* Coop: player 2 collects small pickups (shared rupees / hearts);
+         * items with an item-get scene are left for player 1. */
+        extern int Port_Coop_IsPlayer2Entity(const void* entity);
+        if ((super->contactFlags & CONTACT_NOW) && Port_Coop_IsPlayer2Entity(super->contactedEntity) &&
+            CheckShouldPlayItemGetCutscene(this)) {
+            super->contactFlags = 0;
+        }
+    }
+#endif
     if (super->contactFlags & CONTACT_NOW) {
         switch (super->contactFlags & 0x7F) {
             case 20:

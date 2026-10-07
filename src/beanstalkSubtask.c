@@ -408,6 +408,26 @@ u32 UpdatePlayerCollision(void) {
     animationState1 = gPlayerEntity.base.animationState;
     animationState2 = animationState1 & 0xff;
 
+#ifdef PC_PORT
+    {
+        /* Coop: signs, small chests, keyed doors and minish portals are
+         * player 1's (port_coop.c); player 2 walks past them. */
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0) {
+            switch (direction) {
+                case ACT_TILE_58:
+                case ACT_TILE_91:
+                case SPECIAL_TILE_81:
+                case ACT_TILE_26:
+                case ACT_TILE_113:
+                case ACT_TILE_61:
+                case SPECIAL_TILE_64 ... SPECIAL_TILE_72:
+                    return 0;
+            }
+        }
+    }
+#endif
+
     switch (direction) {
         case SPECIAL_TILE_0:
             if (sub_0801A458(mapLayer, position, 2) == 0) {
