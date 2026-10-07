@@ -25,7 +25,9 @@ void Port_Coop_RequestJoin(void);
 int Port_Coop_IsP2Active(void);
 
 /* ram_UpdateEntities: switch to the entity's owner before its update and
- * collision, back to player 1 after. Returns the token for End. */
+ * collision, back to player 1 after. Returns the token for End;
+ * PORT_COOP_SKIP_UPDATE = don't update (or draw) this entity this frame. */
+#define PORT_COOP_SKIP_UPDATE 3
 int Port_Coop_BeginEntityUpdate(void* entity);
 void Port_Coop_EndEntityUpdate(int token);
 

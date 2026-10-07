@@ -259,6 +259,12 @@ void ram_UpdateEntities(u32 mode) {
             /* Coop: player 2 and everything it spawned update with player 2
              * as the "current player" (port/port_coop.c), collision included. */
             const int coopToken = Port_Coop_BeginEntityUpdate(entity);
+            if (coopToken == PORT_COOP_SKIP_UPDATE) {
+                /* Put away (player 2 during player 1's cutscene): no update,
+                 * no draw registration, no collision this frame. */
+                entity = entity->next;
+                continue;
+            }
 
             if (kind < 10) {
 

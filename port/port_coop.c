@@ -53,6 +53,10 @@ extern GenericEntity gEntities[MAX_ENTITIES];
 extern GenericEntity gAuxPlayerEntities[MAX_AUX_PLAYER_ENTITIES];
 extern void UpdatePlayerInput(void);
 extern UpdateContext gUpdateContext;
+extern void UnloadOBJPalette2(Entity* ent);
+extern void sub_0805EC60(Entity* ent);
+extern void sub_08017744(Entity* ent);
+extern void UnloadHitbox(Entity* ent);
 
 #define P2 (&gPortPlayerEntities[1].base)
 
@@ -61,6 +65,18 @@ static int sP2Active;                /* player 2 has joined */
 static int sJoinRequested;
 static unsigned short sP2Held, sP2PrevHeld;
 static unsigned char sLastArea = 0xff, sLastRoom = 0xff;
+static int sHidden;                  /* player 1 is busy: player 2 is put away */
+static u8 sHiddenDraw;               /* player 2's draw mode when put away */
+static int sSpawnSettle;             /* frames until a fresh spawn has taken its form */
+static s16 sP2PrevX, sP2PrevY;       /* player 2's position before its update (leash) */
+
+/* The leash: how far apart the two Links may be — a native 240x160 screen
+ * minus a margin. Game logic, not the camera: the same on any view size. */
+#define LEASH_X (240 - 48)
+#define LEASH_Y (160 - 48)
+/* Player 1 walked further than this away: player 2 is brought along. */
+#define LEASH_PULL_X (LEASH_X + 24)
+#define LEASH_PULL_Y (LEASH_Y + 24)
 
 /* Owner of each pooled entity: 1 = spawned while player 2 was current. */
 static unsigned char sOwnerEntities[MAX_ENTITIES];
@@ -126,6 +142,10 @@ typedef struct {
      * events (item get, death, captured). Player 2's must not stop the
      * world for player 1; a freeze player 1 raised still stops player 2. */
     u8 eventPriority, entPriority;
+    /* The area's minish-portal state (gArea.portal_*) is computed by the
+     * portal manager from player 1. Read by player 2's code it made player 2
+     * jump onto the stump and keep the portal pose: player 2 sees no portal. */
+    u8 portalMode;
 } SavedP1;
 
 static SavedP1 sSaved;
@@ -143,6 +163,8 @@ static void EnterP2(void) {
     sSaved.picolyteTimer = gSave.stats.picolyteTimer;
     sSaved.eventPriority = gPriorityHandler.event_priority;
     sSaved.entPriority = gPriorityHandler.ent_priority;
+    sSaved.portalMode = gArea.portal_mode;
+    gArea.portal_mode = 0;
     gInput = sP2Input;
     SetCurrent(1);
 }
@@ -164,17 +186,22 @@ static void LeaveP2(void) {
     gSave.stats.picolyteTimer = sSaved.picolyteTimer;
     gPriorityHandler.event_priority = sSaved.eventPriority;
     gPriorityHandler.ent_priority = sSaved.entPriority;
+    gArea.portal_mode = sSaved.portalMode;
 }
 
 int Port_Coop_BeginEntityUpdate(void* entity) {
     if (!sP2Active || sCurrent != 0)
         return 0;
     if (entity == (void*)P2) {
+        if (sHidden)
+            return PORT_COOP_SKIP_UPDATE; /* put away while player 1 is busy */
+        sP2PrevX = P2->x.HALF.HI;
+        sP2PrevY = P2->y.HALF.HI;
         EnterP2();
         /* Player 1's UpdatePlayerInput ran at the top of UpdateEntities;
          * player 2's runs here, against player 2's gInput / gPlayerState. */
         UpdatePlayerInput();
-        return 1;
+        return 2;
     }
     {
         unsigned char* owner = OwnerSlot(entity);
@@ -186,7 +213,23 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
     return 0;
 }
 
+static int Apart(s32 x, s32 y, s32 limX, s32 limY) {
+    const Entity* p1 = &gPortPlayerEntities[0].base;
+    s32 dx = x - p1->x.HALF.HI, dy = y - p1->y.HALF.HI;
+    return dx > limX || dx < -limX || dy > limY || dy < -limY;
+}
+
 void Port_Coop_EndEntityUpdate(int token) {
+    if (token == 2) {
+        /* Leash: player 2's own step may not take it further than a screen
+         * from player 1 (it stops at the edge, like a wall). */
+        Entity* p2 = P2;
+        if (Apart(p2->x.HALF.HI, p2->y.HALF.HI, LEASH_X, LEASH_Y) &&
+            !Apart(sP2PrevX, sP2PrevY, LEASH_X, LEASH_Y)) {
+            p2->x.HALF.HI = sP2PrevX;
+            p2->y.HALF.HI = sP2PrevY;
+        }
+    }
     if (token)
         LeaveP2();
 }
@@ -225,7 +268,7 @@ void Port_Coop_PopPlayer(int prev) {
  * plates) check the other player too: -1 when there is none, otherwise the
  * index to pass back to Port_Coop_PopPlayer. */
 int Port_Coop_PushOtherPlayer(void) {
-    if (!sP2Active || !P2Linked())
+    if (!sP2Active || sHidden || !P2Linked())
         return -1;
     return Port_Coop_PushPlayer(1 - sCurrent);
 }
@@ -253,7 +296,7 @@ Entity* Port_Coop_PickEnemyTarget(Entity* (*filter)(void)) {
     s32 bestD2 = 0x7fffffff;
     int prev, i;
 
-    if (!sP2Active || !P2Linked())
+    if (!sP2Active || sHidden || !P2Linked())
         return filter();
     prev = sCurrent;
     for (i = 0; i < PORT_MAX_PLAYERS; i++) {
@@ -303,6 +346,22 @@ void Port_Coop_TintP2Palette(unsigned short* colors) {
         if (g > r + 2 && g > b + 2)
             colors[i] = (u16)(g | (r << 5) | (b << 10));
     }
+}
+
+/* ---- camera (stage 3) ------------------------------------------------- */
+
+/* Scroll1's follow point: the middle of the two Links while both play
+ * freely; otherwise (player 2 away or put away, a cutscene, a scripted
+ * camera target) the game's own target. Display only — no game logic reads
+ * it, so different screens may frame differently. */
+void Port_Coop_CameraFocus(const Entity* target, s32* x, s32* y) {
+    const Entity* p1 = &gPortPlayerEntities[0].base;
+    if (!sP2Active || sHidden || target != p1 || !P2Linked())
+        return;
+    if (gPortPlayerStates[0].controlMode != CONTROL_ENABLED)
+        return;
+    *x = (p1->x.HALF.HI + P2->x.HALF.HI) / 2;
+    *y = (p1->y.HALF.HI + P2->y.HALF.HI) / 2;
 }
 
 /* ---- lifecycle -------------------------------------------------------- */
@@ -355,14 +414,37 @@ static void SpotNextToP1(s16* x, s16* y) {
     }
 }
 
-static void SpawnP2(void) {
+/* Free what player 2's last spawn took (VRAM slot, palettes, sprite parts,
+ * hitbox) before spawning it again in the same area — what DeleteEntity
+ * does, minus unlinking the list node, which UnlinkP2 handles. After an
+ * area load those pools were reset and must not be touched. */
+static void ReleaseP2(void) {
+    Entity* e = P2;
+    if (!P2Linked())
+        return;
+    UnloadGFXSlots(e);
+    UnloadOBJPalette(e);
+    UnloadOBJPalette2(e);
+    sub_0805EC60(e);
+    sub_08017744(e);
+    UnloadHitbox(e);
+}
+
+static void SpawnP2As(int minish) {
     const Entity* p1 = &gPortPlayerEntities[0].base;
     PlayerRoomStatus saved = gRoomTransition.player_status;
     s16 x, y;
 
+    ReleaseP2();
     UnlinkP2();
-    SpotNextToP1(&x, &y);
-    gRoomTransition.player_status.spawn_type = PL_SPAWN_DEFAULT;
+    if (minish) {
+        /* Minish paths are a tile wide: stand on player 1. */
+        x = p1->x.HALF.HI;
+        y = p1->y.HALF.HI;
+    } else {
+        SpotNextToP1(&x, &y);
+    }
+    gRoomTransition.player_status.spawn_type = minish ? PL_SPAWN_MINISH : PL_SPAWN_DEFAULT;
     gRoomTransition.player_status.start_pos_x = x;
     gRoomTransition.player_status.start_pos_y = y;
     gRoomTransition.player_status.start_anim = p1->animationState;
@@ -377,9 +459,17 @@ static void SpawnP2(void) {
     gRoomTransition.player_status = saved;
 
     sP2Active = 1;
-    fprintf(stderr, "[coop] player 2 joined at (%d,%d) area=0x%02x room=0x%02x\n",
-            (int)(x - gRoomControls.origin_x), (int)(y - gRoomControls.origin_y), (unsigned)gRoomControls.area,
-            (unsigned)gRoomControls.room);
+    sHidden = 0;
+    /* A minish spawn only sets PL_MINISH on player 2's first update(s);
+     * don't compare sizes until it has (no re-spawn loop). */
+    sSpawnSettle = 30;
+    fprintf(stderr, "[coop] player 2 %s at (%d,%d) area=0x%02x room=0x%02x\n",
+            minish ? "spawned (minish)" : "spawned", (int)(x - gRoomControls.origin_x),
+            (int)(y - gRoomControls.origin_y), (unsigned)gRoomControls.area, (unsigned)gRoomControls.room);
+}
+
+static void SpawnP2(void) {
+    SpawnP2As((gPortPlayerStates[0].flags & PL_MINISH) != 0);
 }
 
 /* Player 1 changed rooms within the area: bring player 2 along. */
@@ -387,7 +477,12 @@ static void FollowP1(void) {
     Entity* p2 = P2;
     const Entity* p1 = &gPortPlayerEntities[0].base;
     s16 x, y;
-    SpotNextToP1(&x, &y);
+    if (gPortPlayerStates[0].flags & PL_MINISH) {
+        x = p1->x.HALF.HI; /* minish paths are a tile wide */
+        y = p1->y.HALF.HI;
+    } else {
+        SpotNextToP1(&x, &y);
+    }
     p2->x.HALF.HI = x;
     p2->y.HALF.HI = y;
     p2->z.WORD = 0;
@@ -458,4 +553,51 @@ void Port_Coop_FrameTick(void) {
     }
     sLastArea = gRoomControls.area;
     sLastRoom = gRoomControls.room;
+
+    {
+        const Entity* p1 = &gPortPlayerEntities[0].base;
+        const PlayerState* p1s = &gPortPlayerStates[0];
+        Entity* p2 = P2;
+        /* Player 1 is in a cutscene, dialogue, item get, portal, transition:
+         * player 2 is put away (not updated, drawn or hit) until it ends. */
+        const int busy = p1s->controlMode != CONTROL_ENABLED || (gMessage.state & MESSAGE_ACTIVE) ||
+                         gPriorityHandler.event_priority != 0 || (p1s->flags & PL_USE_PORTAL) ||
+                         (p1->action != PLAYER_NORMAL && p1->action != PLAYER_MINISH && p1->action != PLAYER_ROLL &&
+                          p1->action != PLAYER_JUMP && p1->action != PLAYER_PUSH && p1->action != PLAYER_PULL &&
+                          p1->action != PLAYER_BOUNCE);
+        if (busy) {
+            if (!sHidden) {
+                sHidden = 1;
+                sHiddenDraw = p2->spriteSettings.draw;
+                p2->spriteSettings.draw = 0;
+                COLLISION_OFF(p2);
+            }
+            return;
+        }
+        if (sHidden) {
+            sHidden = 0;
+            if ((p1s->flags & PL_MINISH) != (gPortPlayerStates[1].flags & PL_MINISH)) {
+                SpawnP2(); /* comes back at player 1's size */
+            } else {
+                FollowP1();
+                p2->spriteSettings.draw = sHiddenDraw ? sHiddenDraw : 1;
+                COLLISION_ON(p2);
+            }
+            return;
+        }
+        if (sSpawnSettle > 0) {
+            sSpawnSettle--;
+            return;
+        }
+        /* Minish: only together. Player 1 shrank or grew (portal, cap):
+         * player 2 is spawned again on player 1 at the same size. */
+        if ((p1s->flags & PL_MINISH) != (gPortPlayerStates[1].flags & PL_MINISH)) {
+            SpawnP2();
+            return;
+        }
+        /* Leash, player 1's side: walked off further than a screen away,
+         * player 2 is brought along. */
+        if (Apart(p2->x.HALF.HI, p2->y.HALF.HI, LEASH_PULL_X, LEASH_PULL_Y))
+            FollowP1();
+    }
 }
