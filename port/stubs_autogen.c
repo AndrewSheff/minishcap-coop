@@ -630,8 +630,17 @@ u32 ram_CollideAll(void) {
              *  3. Call handler (applies damage, knockback, iframes)
              *  4. Set knockbackDirection on both entities
              * If the handler returns NO_COLLISION, skip contactFlags. */
-            if (!PortCalcCollision(thisEntity, other)) {
-                continue;
+            {
+                /* Coop: a hit involving player 2 (or its sword) resolves
+                 * against player 2's state (port_coop.c). */
+                extern int Port_Coop_BeginCollision(const void* a, const void* b);
+                extern void Port_Coop_EndCollision(int token);
+                const int coopTok = Port_Coop_BeginCollision(thisEntity, other);
+                const u32 hit = PortCalcCollision(thisEntity, other);
+                Port_Coop_EndCollision(coopTok);
+                if (!hit) {
+                    continue;
+                }
             }
 
             if ((other->contactFlags & 0x80) == 0) {

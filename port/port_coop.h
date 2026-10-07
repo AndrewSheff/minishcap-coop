@@ -36,6 +36,18 @@ void Port_Coop_OnEntityAppended(void* entity);
 /* 0 = player 1, 1 = player 2. */
 int Port_Coop_CurrentPlayer(void);
 
+/* Stage 2 — the world sees player 2. */
+int Port_Coop_IsPlayer2Entity(const void* entity);
+int Port_Coop_PushPlayer(int idx);
+void Port_Coop_PopPlayer(int prev);
+int Port_Coop_PushOtherPlayer(void);
+int Port_Coop_BeginCollision(const void* a, const void* b);
+void Port_Coop_EndCollision(int token);
+unsigned int Port_Coop_PlayerPalette(unsigned int paletteId);
+int Port_Coop_IsP2Palette(unsigned int paletteId);
+unsigned int Port_Coop_P2PaletteBase(unsigned int paletteId);
+void Port_Coop_TintP2Palette(unsigned short* colors);
+
 #ifdef __cplusplus
 }
 #endif

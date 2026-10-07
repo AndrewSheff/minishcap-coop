@@ -14,6 +14,13 @@ Entity* sub_08049DF4(u32 arg0) {
     if (gEnemyTarget != NULL) {
         return gEnemyTarget;
     }
+#ifdef PC_PORT
+    {
+        /* Coop: the nearest player that passes this filter (port_coop.c). */
+        extern Entity* Port_Coop_PickEnemyTarget(Entity * (*filter)(void));
+        return Port_Coop_PickEnemyTarget(gUnk_080D3BE8[arg0]);
+    }
+#endif
     return gUnk_080D3BE8[arg0]();
 }
 

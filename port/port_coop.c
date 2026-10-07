@@ -52,6 +52,7 @@ extern CarriedEntity* gPortCurCarriedEntity;
 extern GenericEntity gEntities[MAX_ENTITIES];
 extern GenericEntity gAuxPlayerEntities[MAX_AUX_PLAYER_ENTITIES];
 extern void UpdatePlayerInput(void);
+extern UpdateContext gUpdateContext;
 
 #define P2 (&gPortPlayerEntities[1].base)
 
@@ -117,6 +118,14 @@ typedef struct {
     Input input;
     Entity* cameraTarget;
     u8 rActionInteractTile, rActionGrabbing, rActionPlayerState;
+    /* Shared timers HandlePlayerLife ticks once per player per frame: player
+     * 2's tick is undone so charms / picolytes last as long as in 1P. */
+    u8 charm, picolyteType;
+    u16 charmTimer, picolyteTimer;
+    /* World freeze: player code raises the event priority for its own
+     * events (item get, death, captured). Player 2's must not stop the
+     * world for player 1; a freeze player 1 raised still stops player 2. */
+    u8 eventPriority, entPriority;
 } SavedP1;
 
 static SavedP1 sSaved;
@@ -128,6 +137,12 @@ static void EnterP2(void) {
     sSaved.rActionInteractTile = gHUD.rActionInteractTile;
     sSaved.rActionGrabbing = gHUD.rActionGrabbing;
     sSaved.rActionPlayerState = gHUD.rActionPlayerState;
+    sSaved.charm = gSave.stats.charm;
+    sSaved.picolyteType = gSave.stats.picolyteType;
+    sSaved.charmTimer = gSave.stats.charmTimer;
+    sSaved.picolyteTimer = gSave.stats.picolyteTimer;
+    sSaved.eventPriority = gPriorityHandler.event_priority;
+    sSaved.entPriority = gPriorityHandler.ent_priority;
     gInput = sP2Input;
     SetCurrent(1);
 }
@@ -143,6 +158,12 @@ static void LeaveP2(void) {
     gHUD.rActionInteractTile = sSaved.rActionInteractTile;
     gHUD.rActionGrabbing = sSaved.rActionGrabbing;
     gHUD.rActionPlayerState = sSaved.rActionPlayerState;
+    gSave.stats.charm = sSaved.charm;
+    gSave.stats.picolyteType = sSaved.picolyteType;
+    gSave.stats.charmTimer = sSaved.charmTimer;
+    gSave.stats.picolyteTimer = sSaved.picolyteTimer;
+    gPriorityHandler.event_priority = sSaved.eventPriority;
+    gPriorityHandler.ent_priority = sSaved.entPriority;
 }
 
 int Port_Coop_BeginEntityUpdate(void* entity) {
@@ -168,6 +189,120 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
 void Port_Coop_EndEntityUpdate(int token) {
     if (token)
         LeaveP2();
+}
+
+/* ---- the world sees player 2 (stage 2) ---------------------------------- */
+
+static int P2Linked(void);
+
+/* Player 2 itself, or an entity it spawned (sword, arrows, effects). */
+int Port_Coop_IsPlayer2Entity(const void* entity) {
+    if (!sP2Active || entity == NULL)
+        return 0;
+    if (entity == (const void*)P2)
+        return 1;
+    {
+        unsigned char* owner = OwnerSlot(entity);
+        return owner != NULL && *owner == 1;
+    }
+}
+
+/* Point the "current player" at idx (pointers only — gInput and the
+ * player-1 HUD / camera stay as they are). Returns the previous index for
+ * Port_Coop_PopPlayer. */
+int Port_Coop_PushPlayer(int idx) {
+    const int prev = sCurrent;
+    SetCurrent(idx);
+    return prev;
+}
+
+void Port_Coop_PopPlayer(int prev) {
+    if (prev >= 0)
+        SetCurrent(prev);
+}
+
+/* World objects that look for "the player" (floor buttons, pressure
+ * plates) check the other player too: -1 when there is none, otherwise the
+ * index to pass back to Port_Coop_PopPlayer. */
+int Port_Coop_PushOtherPlayer(void) {
+    if (!sP2Active || !P2Linked())
+        return -1;
+    return Port_Coop_PushPlayer(1 - sCurrent);
+}
+
+/* Collision between two entities: run the handler as player 2 when either
+ * side is player 2's (its damage, knockback and iframes land on player 2).
+ * Returns the token for Port_Coop_EndCollision. */
+int Port_Coop_BeginCollision(const void* a, const void* b) {
+    if (sCurrent == 0 && (Port_Coop_IsPlayer2Entity(a) || Port_Coop_IsPlayer2Entity(b)))
+        return Port_Coop_PushPlayer(1) + 1;
+    return 0;
+}
+
+void Port_Coop_EndCollision(int token) {
+    if (token)
+        Port_Coop_PopPlayer(token - 1);
+}
+
+/* Enemy target filters (src/code_08049DF4.c): run the filter for each
+ * player and keep the eligible one nearest to the enemy being updated. */
+Entity* Port_Coop_PickEnemyTarget(Entity* (*filter)(void)) {
+    extern Entity* gEnemyTarget;
+    const Entity* self = gUpdateContext.current_entity;
+    Entity* best = NULL;
+    s32 bestD2 = 0x7fffffff;
+    int prev, i;
+
+    if (!sP2Active || !P2Linked())
+        return filter();
+    prev = sCurrent;
+    for (i = 0; i < PORT_MAX_PLAYERS; i++) {
+        Entity* t;
+        SetCurrent(i);
+        gEnemyTarget = NULL;
+        t = filter();
+        if (t != NULL) {
+            s32 dx = self ? t->x.HALF.HI - self->x.HALF.HI : (i == prev ? 0 : 0x7fff);
+            s32 dy = self ? t->y.HALF.HI - self->y.HALF.HI : 0;
+            s32 d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) {
+                bestD2 = d2;
+                best = t;
+            }
+        }
+    }
+    SetCurrent(prev);
+    gEnemyTarget = best;
+    return best;
+}
+
+/* Player 2's tunic: its OBJ palette ids are the game's player palette ids
+ * (normal 0x16, charms 0x17-0x19, hurt blink 0x1a-0x1b) + this offset; the
+ * colours are the game's own palette with the green recoloured red. */
+#define COOP_P2_PALETTE_OFFSET 0x400
+
+unsigned int Port_Coop_PlayerPalette(unsigned int paletteId) {
+    return sCurrent == 1 ? paletteId + COOP_P2_PALETTE_OFFSET : paletteId;
+}
+
+int Port_Coop_IsP2Palette(unsigned int paletteId) {
+    return paletteId >= COOP_P2_PALETTE_OFFSET && paletteId < COOP_P2_PALETTE_OFFSET + 0x100;
+}
+
+unsigned int Port_Coop_P2PaletteBase(unsigned int paletteId) {
+    return paletteId - COOP_P2_PALETTE_OFFSET;
+}
+
+/* Recolour one loaded 16-colour OBJ palette (GBA BGR555): green-dominant
+ * colours (tunic, cap) swap their red and green channels. */
+void Port_Coop_TintP2Palette(unsigned short* colors) {
+    int i;
+    for (i = 1; i < 16; i++) {
+        u16 c = colors[i];
+        u16 r = c & 0x1f, g = (c >> 5) & 0x1f, b = (c >> 10) & 0x1f;
+        if (g > r + 2 && g > b + 2)
+            colors[i] = (u16)(g | (r << 5) | (b << 10));
+    }
 }
 
 /* ---- lifecycle -------------------------------------------------------- */
