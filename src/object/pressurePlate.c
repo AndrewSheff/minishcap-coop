@@ -158,6 +158,16 @@ static u32 get_standing_count(PressurePlateEntity* this) {
                 gPlayerEntity.base.spriteOffsetY = sSpriteOffsets[PLATE_DIR(this)];
                 num++;
             }
+            /* ...and so do its Four Sword clones. */
+            if ((gPlayerState.flags & PL_CLONING) != 0) {
+                u32 i;
+                for (i = 0; i < 3; ++i) {
+                    if (gPlayerClones[i] != NULL && IsColliding(super, gPlayerClones[i]) != 0) {
+                        gPlayerClones[i]->spriteOffsetY = sSpriteOffsets[PLATE_DIR(this)];
+                        num++;
+                    }
+                }
+            }
             Port_Coop_PopPlayer(prev);
         }
     }

@@ -1175,5 +1175,21 @@ void Port_Coop_FrameTick(void) {
                 sStuck = 0;
             }
         }
+        /* Watchdog: player 2 left without control for 10 s while player 1
+         * plays freely and no text is up — an enemy that grabbed it ran
+         * player-1-only follow-up (a boss carrying it off, a capture whose
+         * release went to player 1) — is respawned beside player 1. */
+        {
+            static int sLocked;
+            if (gPortPlayerStates[1].controlMode != CONTROL_ENABLED && (gMessage.state & MESSAGE_ACTIVE) == 0) {
+                if (++sLocked > 600) {
+                    sLocked = 0;
+                    fprintf(stderr, "[coop] player 2 without control for 10 s; respawned\n");
+                    SpawnP2();
+                }
+            } else {
+                sLocked = 0;
+            }
+        }
     }
 }

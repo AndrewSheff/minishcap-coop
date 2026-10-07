@@ -217,6 +217,24 @@ void VaatiProjectileFunction0Action7(VaatiProjectileEntity* this) {
     LinearMoveUpdate(super);
     sub_0803E4D8(this);
     if ((gRoomControls.origin_y + gRoomControls.height + -0x10) <= super->y.HALF.HI) {
+#ifdef PC_PORT
+        {
+            /* Coop: carrying player 2 off ends here — the room exit is
+             * player 1's. Player 2 is let go (it walks back or the leash
+             * brings it) and the hand is spent, as if destroyed. */
+            extern int Port_Coop_CurrentPlayer(void);
+            if (Port_Coop_CurrentPlayer() == 1) {
+                gPlayerState.controlMode = CONTROL_ENABLED;
+                gPlayerState.flags &= ~PL_DISABLE_ITEMS;
+                gPlayerEntity.base.flags |= ENT_COLLIDE;
+                gPlayerEntity.base.spriteOrientation.flipY = 0;
+                COLLISION_OFF(super);
+                super->contactFlags = 0;
+                super->health = 0;
+                return;
+            }
+        }
+#endif
         SetInitializationPriority();
         // TODO super screen transition is to mazaal. Is super also the projectile for Mazaals shrink ray?
         DoExitTransition(&gUnk_0813AB94);
