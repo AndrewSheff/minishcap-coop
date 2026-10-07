@@ -75,6 +75,7 @@ PortCoopState gPortCoopState = { .lastArea = 0xff, .lastRoom = 0xff };
 #define sOwnerEntities gPortCoopState.ownerEntities   /* 1 = spawned while player 2 was current */
 #define sOwnerAux gPortCoopState.ownerAux
 #define sFocus gPortCoopState.focus                   /* enemies: the player each one is busy with */
+#define sPassenger gPortCoopState.passenger           /* player 2 rides along with player 1 */
 
 static int sCurrent;                 /* 0 = player 1, 1 = player 2 */
 static int sJoinRequested;
@@ -293,6 +294,7 @@ static void LeaveP2(void) {
 }
 
 static int P2Linked(void);
+static void Ride(void);
 static int ChooseFocus(const Entity* e, unsigned char* focus);
 static int FocusManaged(const Entity* e);
 static const Entity* FocusRoot(const Entity* e);
@@ -313,6 +315,12 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
     if (entity == (void*)P2) {
         if (sHidden)
             return PORT_COOP_SKIP_UPDATE; /* put away while player 1 is busy */
+        if (sPassenger) {
+            /* Riding along (minecart, whirlwind glide): carried right behind
+             * player 1, not controlled, still drawn. */
+            Ride();
+            return PORT_COOP_SKIP_UPDATE;
+        }
         sP2PrevX = P2->x.HALF.HI;
         sP2PrevY = P2->y.HALF.HI;
         EnterP2();
@@ -359,6 +367,24 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
         }
     }
     return 0;
+}
+
+/* Passenger: player 2 sits right behind player 1 (opposite its facing) at
+ * player 1's height and layer, and is drawn there; its own update is off. */
+static void Ride(void) {
+    static const s8 kBehind[4][2] = { { 0, 10 }, { -10, 0 }, { 0, -10 }, { 10, 0 } };
+    extern void DrawEntity(Entity*);
+    Entity* p2 = P2;
+    const Entity* p1 = &gPortPlayerEntities[0].base;
+    const s8* off = kBehind[(p1->animationState >> 1) & 3];
+    p2->x.HALF.HI = p1->x.HALF.HI + off[0];
+    p2->y.HALF.HI = p1->y.HALF.HI + off[1];
+    p2->z.WORD = p1->z.WORD;
+    p2->collisionLayer = p1->collisionLayer;
+    p2->spriteRendering.b3 = p1->spriteRendering.b3;
+    p2->spritePriority.b0 = p1->spritePriority.b0 + 1;
+    COLLISION_OFF(p2);
+    DrawEntity(p2);
 }
 
 static int Apart(s32 x, s32 y, s32 limX, s32 limY) {
@@ -630,7 +656,7 @@ void Port_Coop_TintP2Palette(unsigned short* colors) {
 /* Can an enemy go after player idx right now? */
 static int Targetable(int idx) {
     const PlayerState* ps = &gPortPlayerStates[idx];
-    if (idx == 1 && (!sP2Active || sHidden))
+    if (idx == 1 && (!sP2Active || sHidden || sPassenger))
         return 0;
     return ps->killed == 0 &&
            !(ps->flags & (PL_DROWNING | PL_USE_PORTAL | PL_HIDDEN | PL_FALLING | PL_IN_HOLE | PL_CLIMBING));
@@ -975,6 +1001,35 @@ void Port_Coop_FrameTick(void) {
                 gPortPlayerEntities[0].base.updatePriority < PRIO_PLAYER_EVENT)
                 gPriorityHandler.event_priority = PRIO_MIN;
             fprintf(stderr, "[coop] player 2 knocked out\n");
+            return;
+        }
+    }
+
+    {
+        /* Player 1 rides a minecart or glides off a whirlwind (Roc's cape):
+         * player 2 rides along as a passenger, and gets off where player 1
+         * does. */
+        const PlayerState* p1s = &gPortPlayerStates[0];
+        const int ride = (p1s->flags & (PL_IN_MINECART | PL_PARACHUTE)) != 0 ||
+                         gPortPlayerEntities[0].base.action == PLAYER_PARACHUTE;
+        if (ride && gPortCoopState.koTimer == 0) {
+            if (sHidden) {
+                /* Put away while boarding: back on screen as a passenger. */
+                sHidden = 0;
+                P2->spriteSettings.draw = sHiddenDraw ? sHiddenDraw : 1;
+            }
+            if (!sPassenger) {
+                sPassenger = 1;
+                fprintf(stderr, "[coop] player 2 rides along\n");
+            }
+            return;
+        }
+        if (sPassenger) {
+            Entity* p2 = P2;
+            sPassenger = 0;
+            p2->z.WORD = 0;
+            FollowP1();
+            COLLISION_ON(p2);
             return;
         }
     }

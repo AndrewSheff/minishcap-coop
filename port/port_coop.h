@@ -34,6 +34,7 @@ typedef struct PortCoopState {
     unsigned char healthInit;
     unsigned char pad2;
     int koTimer; /* player 2 knocked out: frames until it is back */
+    int passenger; /* player 1 rides (minecart, whirlwind glide): player 2 rides along */
 } PortCoopState;
 extern PortCoopState gPortCoopState;
 #endif
