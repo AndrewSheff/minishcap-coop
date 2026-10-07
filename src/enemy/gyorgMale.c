@@ -1043,13 +1043,49 @@ void sub_08047D88(GyorgMaleEntity* this) {
     this->unk_7c |= 1;
 }
 
+#ifdef PC_PORT
+/* Coop: the other Link can ride Gyorg too — when it stands on the boss it is
+ * carried by the boss's movement each frame (port_coop.c). The turn that
+ * swings player 1 around the boss's centre is not repeated for it. */
+extern int Port_Coop_PushOtherPlayer(void);
+extern void Port_Coop_PopPlayer(int prev);
+static int CoopOtherOnBoard(GyorgMaleEntity* this) {
+    int onBoard = 0;
+    const int prev = Port_Coop_PushOtherPlayer();
+    if (prev >= 0) {
+        if (super->animIndex != 1 && gPlayerEntity.base.z.HALF.HI == 0 &&
+            EntityWithinDistance(super, gPlayerEntity.base.x.HALF.HI, gPlayerEntity.base.y.HALF.HI, 0x20) &&
+            PlayerCanBeMoved()) {
+            gPlayerState.field_0x14 = 1;
+            onBoard = 1;
+        }
+        Port_Coop_PopPlayer(prev);
+    }
+    return onBoard;
+}
+static void CoopCarryOther(GyorgMaleEntity* this, int onBoard, u32 oldX, u32 oldY) {
+    extern void Port_Coop_CarryOtherPlayer(int dx, int dy);
+    if (onBoard)
+        Port_Coop_CarryOtherPlayer((s32)super->x.HALF.HI - (s32)oldX, (s32)super->y.HALF.HI - (s32)oldY);
+}
+#define COOP_RIDE_BEGIN() const int coopOnBoard = CoopOtherOnBoard(this)
+#define COOP_RIDE_END() CoopCarryOther(this, coopOnBoard, oldX, oldY)
+#else
+#define COOP_RIDE_BEGIN()
+#define COOP_RIDE_END()
+#endif
+
 void sub_08047DF0(GyorgMaleEntity* this, u32 unk1) {
     u32 oldX, oldY;
     sub_08047D88(this);
     sub_08047EA4(this, unk1);
     oldX = super->x.HALF.HI;
     oldY = super->y.HALF.HI;
-    LinearMoveAngle(super, super->speed, super->direction);
+    {
+        COOP_RIDE_BEGIN();
+        LinearMoveAngle(super, super->speed, super->direction);
+        COOP_RIDE_END();
+    }
     if (this->unk_7c & 1) {
         if (PlayerCanBeMoved()) {
             gPlayerEntity.base.x.HALF.HI += super->x.HALF.HI - oldX;
@@ -1067,7 +1103,11 @@ void sub_08047E58(GyorgMaleEntity* this) {
     u32 oldX, oldY;
     oldX = super->x.HALF.HI;
     oldY = super->y.HALF.HI;
-    LinearMoveAngle(super, super->speed, super->direction);
+    {
+        COOP_RIDE_BEGIN();
+        LinearMoveAngle(super, super->speed, super->direction);
+        COOP_RIDE_END();
+    }
     if (this->unk_7c & 1) {
         if (PlayerCanBeMoved()) {
             gPlayerEntity.base.x.HALF.HI += super->x.HALF.HI - oldX;

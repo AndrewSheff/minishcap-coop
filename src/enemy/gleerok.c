@@ -24,6 +24,24 @@
 #include "port_rom.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef PC_PORT
+/* Coop: the other Link can stand on Gleerok's body too — the same "standing
+ * on the boss" checks run for it (port_coop.c). */
+extern int Port_Coop_PushOtherPlayer(void);
+extern void Port_Coop_PopPlayer(int prev);
+#define COOP_FOR_OTHER(...)                            \
+    do {                                               \
+        const int coopPrev_ = Port_Coop_PushOtherPlayer(); \
+        if (coopPrev_ >= 0) {                          \
+            __VA_ARGS__;                               \
+            Port_Coop_PopPlayer(coopPrev_);            \
+        }                                              \
+    } while (0)
+#else
+#define COOP_FOR_OTHER(...)
+#endif
+
 #endif
 
 typedef struct {
@@ -310,6 +328,8 @@ void Gleerok_OnDeath(GleerokEntity* this) {
             if (sub_0806FC80(super, &gPlayerEntity.base, super->frame & 0x3f)) {
                 gPlayerState.spriteOffsetY = -6;
             }
+            COOP_FOR_OTHER(gPlayerState.field_0x14 = 1;
+                           if (sub_0806FC80(super, &gPlayerEntity.base, super->frame & 0x3f)) gPlayerState.spriteOffsetY = -6);
 
             gUnk_080CD75C[super->action](this);
             sub_0802E518(this);
@@ -737,6 +757,10 @@ void sub_0802D86C(GleerokEntity* this) {
 
             if (((GleerokEntity*)(super->parent))->unk_80 == 0)
                 return;
+            COOP_FOR_OTHER(if (EntityInRectRadius(super, &gPlayerEntity.base, 8, 8)) {
+                gPlayerState.field_0x14 = 1;
+                gPlayerState.spriteOffsetY = -4;
+            });
             if (!EntityInRectRadius(super, &gPlayerEntity.base, 8, 8))
                 return;
 
@@ -1198,6 +1222,10 @@ void sub_0802E0B8(GleerokEntity* this) {
             gPlayerState.field_0x14 = 1;
             gPlayerState.spriteOffsetY = -6;
         }
+        COOP_FOR_OTHER(if (sub_0806FC80(super, &gPlayerEntity.base, val)) {
+            gPlayerState.field_0x14 = 1;
+            gPlayerState.spriteOffsetY = -6;
+        });
     }
 
     if (gUnk_080CD844[this->unk_79 & 0x7f] >= super->health) {
@@ -1248,6 +1276,10 @@ void sub_0802E1D0(GleerokEntity* this) {
             gPlayerState.field_0x14 = 1;
             gPlayerState.spriteOffsetY = -6;
         }
+        COOP_FOR_OTHER(if (sub_0806FC80(super, &gPlayerEntity.base, super->frame & 0x3f)) {
+            gPlayerState.field_0x14 = 1;
+            gPlayerState.spriteOffsetY = -6;
+        });
     }
     if (super->frame & 0x40) {
         u32 i;
