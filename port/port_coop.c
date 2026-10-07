@@ -208,6 +208,14 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
     {
         unsigned char* owner = OwnerSlot(entity);
         if (owner && *owner == 1) {
+            /* ...unless player 1 is the one holding it now. */
+            int i;
+            if (gPortPlayerStates[0].heldObject != 0)
+                for (i = 0; i < MAX_ACTIVE_ITEMS; i++)
+                    if (gPortActiveItems[0][i].field_0x18 == (Entity*)entity) {
+                        *owner = 0;
+                        return 0;
+                    }
             EnterP2();
             return 1;
         }
@@ -230,6 +238,18 @@ void Port_Coop_EndEntityUpdate(int token) {
             !Apart(sP2PrevX, sP2PrevY, LEASH_X, LEASH_Y)) {
             p2->x.HALF.HI = sP2PrevX;
             p2->y.HALF.HI = sP2PrevY;
+        }
+    }
+    if (token == 2 && gPortPlayerStates[1].heldObject != 0) {
+        /* Player 2 lifted or grabbed something (pot, statue...): from now on
+         * that object updates as player 2's, so its "am I still held" checks
+         * read player 2's state. Done here, before the object's own update
+         * this frame. */
+        int i;
+        for (i = 0; i < MAX_ACTIVE_ITEMS; i++) {
+            unsigned char* owner = OwnerSlot(gPortActiveItems[1][i].field_0x18);
+            if (owner)
+                *owner = 1;
         }
     }
     if (token)

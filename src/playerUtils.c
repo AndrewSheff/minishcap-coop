@@ -1596,23 +1596,36 @@ s32 GetInteractableObjectIndex(Entity* entity) {
     return -1;
 }
 
+#ifdef PC_PORT
+/* Coop: liftable objects (pots...) register with every player's carry list,
+ * not just the current one's, so player 2 can pick them up too. */
+extern CarriedEntity gPortCarriedEntities[PORT_MAX_PLAYERS];
+#define FOR_EACH_CARRY_LIST(c) for (CarriedEntity* c = gPortCarriedEntities; c < gPortCarriedEntities + PORT_MAX_PLAYERS; c++)
+#else
+#define FOR_EACH_CARRY_LIST(c) for (CarriedEntity* c = &gCarriedEntity; c == &gCarriedEntity; c++)
+#endif
+
 void RegisterCarryEntity(Entity* this) {
-    if (gCarriedEntity.count < 0x20) {
-        gCarriedEntity.unk_c[gCarriedEntity.count] = this;
-        gCarriedEntity.count++;
+    FOR_EACH_CARRY_LIST(carried) {
+        if (carried->count < 0x20) {
+            carried->unk_c[carried->count] = this;
+            carried->count++;
+        }
     }
 }
 
 void FreeCarryEntity(Entity* this) {
-    u32 index;
-    for (index = 0; index < gCarriedEntity.count; index++) {
-        if (gCarriedEntity.unk_c[index] == this) {
-            gCarriedEntity.count--;
-            break;
+    FOR_EACH_CARRY_LIST(carried) {
+        u32 index;
+        for (index = 0; index < carried->count; index++) {
+            if (carried->unk_c[index] == this) {
+                carried->count--;
+                break;
+            }
         }
-    }
-    for (; index < gCarriedEntity.count; index++) {
-        gCarriedEntity.unk_c[index] = gCarriedEntity.unk_c[index + 1];
+        for (; index < carried->count; index++) {
+            carried->unk_c[index] = carried->unk_c[index + 1];
+        }
     }
 }
 
