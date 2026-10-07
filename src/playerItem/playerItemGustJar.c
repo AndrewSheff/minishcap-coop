@@ -84,7 +84,7 @@ void PlayerItemGustJar_Init(Entity* this) {
     this->hitbox->unk2[3] = 6;
     this->hitbox->unk2[0] = 6;
     sub_080ADC84(this);
-    LoadSwapGFX(this, 1, 3);
+    LoadSwapGFX(this, 1, PLAYER_ITEM_GFX_SLOT);
     InitAnimationForceUpdate(this, this->animationState >> 1);
 }
 

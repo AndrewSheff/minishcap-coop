@@ -109,6 +109,12 @@ u32 Port_Coop_PlayerGfxSlot(Entity* player) {
     return player == P2 ? 0 /* any free slot */ : 2;
 }
 
+unsigned int Port_Coop_PlayerItemGfxSlot(void) {
+    /* An enemy focused on player 2 isn't spawning player items; only player
+     * 2's own update context is. */
+    return (sCurrent == 1 && !sFocusContext) ? 0 /* any free slot */ : 3;
+}
+
 int Port_Coop_CurrentPlayer(void) {
     return sCurrent;
 }

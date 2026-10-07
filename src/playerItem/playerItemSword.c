@@ -62,7 +62,7 @@ void PlayerItemSword_Init(PlayerItemSwordEntity* this) {
     if (AllocMutableHitbox(super) == NULL) {
         DeleteThisEntity();
     }
-    LoadSwapGFX(super, 1, 3);
+    LoadSwapGFX(super, 1, PLAYER_ITEM_GFX_SLOT);
     super->collisionFlags = (gPlayerEntity.base.collisionFlags + 1) | 0x20;
     super->collisionMask = gPlayerEntity.base.collisionMask;
     super->updatePriority = 6;

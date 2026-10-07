@@ -94,7 +94,7 @@ void PlayerItemBoomerang_Init(PlayerItemBoomerangEntity* this) {
     if (super->collisionLayer == 2) {
         super->type2 = 1;
     }
-    LoadSwapGFX(super, 1, 3);
+    LoadSwapGFX(super, 1, PLAYER_ITEM_GFX_SLOT);
     sub_0801766C(super);
     PlayerItemBoomerang_Action1(this);
 }

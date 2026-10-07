@@ -38,7 +38,7 @@ void PlayerItemLantern_Init(Entity* this) {
         DeleteThisEntity();
     }
     sub_0801766C(this);
-    LoadSwapGFX(this, 1, 3);
+    LoadSwapGFX(this, 1, PLAYER_ITEM_GFX_SLOT);
     PlayerItemLantern_Action1(this);
 }
 

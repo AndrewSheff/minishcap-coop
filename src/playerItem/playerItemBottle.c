@@ -86,7 +86,7 @@ void PlayerItemBottle_Init(PlayerItemBottleEntity* this) {
     super->action = 1;
     super->frameIndex = 0xff;
     gPlayerState.item = super;
-    LoadSwapGFX(super, 1, 3);
+    LoadSwapGFX(super, 1, PLAYER_ITEM_GFX_SLOT);
     PlayerItemBottle_Action1(this);
 }
 

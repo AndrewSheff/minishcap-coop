@@ -78,7 +78,7 @@ void PlayerItemShield_Init(PlayerItemShieldEntity* this) {
     }
     super->animationState = gPlayerEntity.base.animationState & 0xe;
     sub_08079BD8(super);
-    LoadSwapGFX(super, 1, 3);
+    LoadSwapGFX(super, 1, PLAYER_ITEM_GFX_SLOT);
     PlayerItemShield_Action1(this);
 }
 

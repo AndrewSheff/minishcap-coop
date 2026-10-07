@@ -26,7 +26,7 @@ void PlayerItemPacciCane(Entity* this) {
 void PlayerItemPacciCane_Init(Entity* this) {
     this->action = 1;
     this->frameIndex = -1;
-    LoadSwapGFX(this, 1, 3);
+    LoadSwapGFX(this, 1, PLAYER_ITEM_GFX_SLOT);
     SoundReq(SFX_10E);
     PlayerItemPacciCane_Action1(this);
 }

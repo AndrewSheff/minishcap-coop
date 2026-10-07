@@ -120,7 +120,7 @@ void PlayerItemBow_Init(PlayerItemBowEntity* this) {
         super->frameIndex = 0xff;
         super->spriteSettings.flipX = gUnk_080B3E40[super->animationState >> 1].spriteSettings;
         gPlayerState.item = super;
-        LoadSwapGFX(super, 1, 3);
+        LoadSwapGFX(super, 1, PLAYER_ITEM_GFX_SLOT);
         sub_08079BD8(super);
         if (this->unk_68 == 0xa) {
             this->unk_78 = 60;

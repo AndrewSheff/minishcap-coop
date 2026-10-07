@@ -27,5 +27,13 @@
 #define gPossibleInteraction (*gPortCurPossibleInteraction)
 #define gCarriedEntity (*gPortCurCarriedEntity)
 
+/* Player items (sword, shield, bow...) load their tiles into the fixed VRAM
+ * slot 3. Player 2's items take a free slot of their own instead, so the
+ * two Links' items don't overwrite each other's tiles (port_coop.c). */
+extern unsigned int Port_Coop_PlayerItemGfxSlot(void);
+#define PLAYER_ITEM_GFX_SLOT Port_Coop_PlayerItemGfxSlot()
+
+#else
+#define PLAYER_ITEM_GFX_SLOT 3
 #endif /* PC_PORT */
 #endif /* PORT_PLAYER_CTX_H */
