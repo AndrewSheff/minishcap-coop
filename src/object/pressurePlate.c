@@ -147,6 +147,21 @@ static u32 get_standing_count(PressurePlateEntity* this) {
         gPlayerEntity.base.spriteOffsetY = sSpriteOffsets[PLATE_DIR(this)];
         num = 1;
     }
+#ifdef PC_PORT
+    {
+        /* Coop: the other player weighs the plate down too (port_coop.c). */
+        extern int Port_Coop_PushOtherPlayer(void);
+        extern void Port_Coop_PopPlayer(int prev);
+        const int prev = Port_Coop_PushOtherPlayer();
+        if (prev >= 0) {
+            if (IsCollidingPlayer(super) != 0) {
+                gPlayerEntity.base.spriteOffsetY = sSpriteOffsets[PLATE_DIR(this)];
+                num++;
+            }
+            Port_Coop_PopPlayer(prev);
+        }
+    }
+#endif
     if ((gPlayerState.flags & PL_CLONING) != 0) {
         /* NULL-clone hazard (same family as #67). Lower-tier swords leave
          * trailing gPlayerClones[] slots NULL and IsColliding derefs its

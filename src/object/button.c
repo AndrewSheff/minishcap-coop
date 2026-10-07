@@ -312,6 +312,20 @@ Entity* sub_08081D74(ButtonEntity* this) {
             }
         }
     }
+#ifdef PC_PORT
+    if (ent == NULL) {
+        /* Coop: the other player presses buttons too (port_coop.c). */
+        extern int Port_Coop_PushOtherPlayer(void);
+        extern void Port_Coop_PopPlayer(int prev);
+        const int prev = Port_Coop_PushOtherPlayer();
+        if (prev >= 0) {
+            if (sub_08081E0C(super) && (gPlayerState.flags & (PL_CAPTURED | PL_MINISH)) == 0) {
+                ent = &gPlayerEntity.base;
+            }
+            Port_Coop_PopPlayer(prev);
+        }
+    }
+#endif
     super->child = ent;
     return ent;
 }
