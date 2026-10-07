@@ -13,6 +13,24 @@
 extern "C" {
 #endif
 
+#ifdef MAX_ENTITIES
+/* Coop state that belongs to the game state: captured by quicksaves. */
+typedef struct PortCoopState {
+    int p2Active;
+    int hidden;
+    int spawnSettle;
+    int sessionChecked;
+    unsigned char hiddenDraw;
+    unsigned char lastArea;
+    unsigned char lastRoom;
+    unsigned char pad;
+    unsigned char ownerEntities[MAX_ENTITIES];
+    unsigned char ownerAux[MAX_AUX_PLAYER_ENTITIES];
+    unsigned char focus[MAX_ENTITIES];
+} PortCoopState;
+extern PortCoopState gPortCoopState;
+#endif
+
 /* Port_UpdateInput: player 2's held GBA keys (active-high mask). */
 void Port_Coop_SetP2Keys(unsigned short heldKeys);
 
@@ -44,6 +62,7 @@ void Port_CoopItems_Enter(void);
 void Port_CoopItems_OnPauseMenuOpen(void);
 int Port_CoopItems_MenuIsP2(void);
 void Port_CoopItems_FrameTick(void);
+int Port_CoopItems_SlotJoined(void);
 void Port_CoopItems_Leave(void);
 unsigned char Port_CoopItems_Equipped(int slot);
 

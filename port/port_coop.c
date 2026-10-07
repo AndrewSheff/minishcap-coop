@@ -62,14 +62,22 @@ extern void UnloadHitbox(Entity* ent);
 
 #define P2 (&gPortPlayerEntities[1].base)
 
+/* State that lives with the game state (quicksave captures it: port_quicksave.c). */
+PortCoopState gPortCoopState = { .lastArea = 0xff, .lastRoom = 0xff };
+#define sP2Active gPortCoopState.p2Active             /* player 2 has joined */
+#define sSessionChecked gPortCoopState.sessionChecked /* the loaded file's "player 2 along" flag was read */
+#define sLastArea gPortCoopState.lastArea
+#define sLastRoom gPortCoopState.lastRoom
+#define sHidden gPortCoopState.hidden                 /* player 1 is busy: player 2 is put away */
+#define sHiddenDraw gPortCoopState.hiddenDraw         /* player 2's draw mode when put away */
+#define sSpawnSettle gPortCoopState.spawnSettle       /* frames until a fresh spawn has taken its form */
+#define sOwnerEntities gPortCoopState.ownerEntities   /* 1 = spawned while player 2 was current */
+#define sOwnerAux gPortCoopState.ownerAux
+#define sFocus gPortCoopState.focus                   /* enemies: the player each one is busy with */
+
 static int sCurrent;                 /* 0 = player 1, 1 = player 2 */
-static int sP2Active;                /* player 2 has joined */
 static int sJoinRequested;
 static unsigned short sP2Held, sP2PrevHeld;
-static unsigned char sLastArea = 0xff, sLastRoom = 0xff;
-static int sHidden;                  /* player 1 is busy: player 2 is put away */
-static u8 sHiddenDraw;               /* player 2's draw mode when put away */
-static int sSpawnSettle;             /* frames until a fresh spawn has taken its form */
 static s16 sP2PrevX, sP2PrevY;       /* player 2's position before its update (leash) */
 
 /* The leash: how far apart the two Links may be — a native 240x160 screen
@@ -81,11 +89,10 @@ static s16 sP2PrevX, sP2PrevY;       /* player 2's position before its update (l
 #define LEASH_PULL_Y (LEASH_Y + 24)
 
 /* Owner of each pooled entity: 1 = spawned while player 2 was current. */
-static unsigned char sOwnerEntities[MAX_ENTITIES];
-static unsigned char sOwnerAux[MAX_AUX_PLAYER_ENTITIES];
 /* Enemies: the player each one is busy with (0 / 1, 0xff = not chosen yet). */
-static unsigned char sFocus[MAX_ENTITIES];
 static int sFocusContext; /* an enemy / enemy projectile is updating */
+static u8 sFocusTransitioning;            /* room-exit state before a focus switch to player 2 */
+static PlayerRoomStatus sFocusStatus;
 
 static unsigned char* OwnerSlot(const void* entity) {
     const GenericEntity* g = (const GenericEntity*)entity;
@@ -184,9 +191,33 @@ typedef struct {
      * portal manager from player 1. Read by player 2's code it made player 2
      * jump onto the stump and keep the portal pose: player 2 sees no portal. */
     u8 portalMode;
+    /* Room exits are player 1's: one requested while player 2 is "the
+     * player" (its stairs, an exit hole, a Wallmaster holding it) is
+     * cancelled and player 2 is brought back to player 1 instead. */
+    u8 transitioningOut;
+    PlayerRoomStatus playerStatus;
 } SavedP1;
 
 static SavedP1 sSaved;
+static int sP2Rescue; /* bring player 2 back to player 1 at the next FrameTick */
+
+static void CancelP2Exit(u8 wasTransitioning, const PlayerRoomStatus* status);
+
+/* A world entity updates with player 2 as "the player" (focus contexts). */
+static void FocusOnP2(void) {
+    sFocusTransitioning = gRoomTransition.transitioningOut;
+    sFocusStatus = gRoomTransition.player_status;
+    Port_Coop_PushPlayer(1);
+}
+
+static void CancelP2Exit(u8 wasTransitioning, const PlayerRoomStatus* status) {
+    if (!wasTransitioning && gRoomTransition.transitioningOut) {
+        gRoomTransition.transitioningOut = 0;
+        gRoomTransition.player_status = *status;
+        sP2Rescue = 1;
+        fprintf(stderr, "[coop] room exit requested by player 2 cancelled; player 2 returns to player 1\n");
+    }
+}
 static Input sP2Input;
 
 static void EnterP2(void) {
@@ -202,6 +233,8 @@ static void EnterP2(void) {
     sSaved.eventPriority = gPriorityHandler.event_priority;
     sSaved.entPriority = gPriorityHandler.ent_priority;
     sSaved.portalMode = gArea.portal_mode;
+    sSaved.transitioningOut = gRoomTransition.transitioningOut;
+    sSaved.playerStatus = gRoomTransition.player_status;
     gArea.portal_mode = 0;
     gInput = sP2Input;
     SetCurrent(1);
@@ -231,6 +264,7 @@ static void LeaveP2(void) {
     if (gPriorityHandler.ent_priority > sSaved.entPriority)
         gPriorityHandler.ent_priority = sSaved.entPriority;
     gArea.portal_mode = sSaved.portalMode;
+    CancelP2Exit(sSaved.transitioningOut, &sSaved.playerStatus);
 }
 
 static int P2Linked(void);
@@ -248,7 +282,7 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
          * player" with a lit lantern: player 2's when only its lantern is
          * lit. */
         sFocusContext = 1;
-        Port_Coop_PushPlayer(1);
+        FocusOnP2();
         return PORT_COOP_FOCUS;
     }
     if (entity == (void*)P2) {
@@ -272,7 +306,7 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
             const GenericEntity* root = (const GenericEntity*)FocusRoot(&g->base);
             sFocusContext = 1;
             if (ChooseFocus(&root->base, &sFocus[root - gEntities]) == 1)
-                Port_Coop_PushPlayer(1);
+                FocusOnP2();
             return PORT_COOP_FOCUS;
         }
         if ((!owner || *owner == 0) && !sHidden && g->base.kind == OBJECT && (g->base.contactFlags & CONTACT_NOW) &&
@@ -281,7 +315,7 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
              * suction, cane, sword): its "what is the player doing" checks
              * (gustJarState...) read player 2's state for this update. */
             sFocusContext = 1;
-            Port_Coop_PushPlayer(1);
+            FocusOnP2();
             return PORT_COOP_FOCUS;
         }
         if (owner && *owner == 1) {
@@ -309,8 +343,10 @@ static int Apart(s32 x, s32 y, s32 limX, s32 limY) {
 void Port_Coop_EndEntityUpdate(int token) {
     if (token == PORT_COOP_FOCUS) {
         sFocusContext = 0;
-        if (sCurrent != 0)
+        if (sCurrent != 0) {
+            CancelP2Exit(sFocusTransitioning, &sFocusStatus);
             Port_Coop_PopPlayer(0);
+        }
         /* Enemy code may point the camera at "the player": keep it on 1. */
         if (gRoomControls.camera_target == P2)
             gRoomControls.camera_target = &gPortPlayerEntities[0].base;
@@ -689,6 +725,19 @@ static void FollowP1(void) {
             (unsigned)gRoomControls.room);
 }
 
+/* The first-visit area-name banner (EnterRoomTextboxManager) is up. */
+static int AreaBannerActive(void) {
+    LinkedList* list = &gEntityLists[8];
+    Entity* e = list->first;
+    int steps = 0;
+    while (e != NULL && e != (Entity*)list && steps++ < 64) {
+        if (e->kind == MANAGER && e->id == ENTER_ROOM_TEXTBOX_MANAGER)
+            return 1;
+        e = e->next;
+    }
+    return 0;
+}
+
 static int GameplayLive(void) {
     const Entity* p1 = &gPortPlayerEntities[0].base;
     return gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN && gMain.substate == GAMEMAIN_UPDATE &&
@@ -704,6 +753,7 @@ void Port_Coop_FrameTick(void) {
     if (!GameplayLive()) {
         if (gMain.task != TASK_GAME) {
             sP2Active = 0; /* back at the title / file select */
+            sSessionChecked = 0;
             sLastArea = sLastRoom = 0xff;
         }
         return;
@@ -732,6 +782,12 @@ void Port_Coop_FrameTick(void) {
                 gPriorityHandler.ent_priority);
     }
     if (!sP2Active) {
+        if (!sSessionChecked) {
+            /* A file was loaded: player 2 was along when it was saved. */
+            sSessionChecked = 1;
+            if (Port_CoopItems_SlotJoined())
+                sJoinRequested = 1;
+        }
         if (getenv("TMC_COOP_NOJOIN"))
             sJoinRequested = 0;
         if (sJoinRequested || (sP2Held != 0 && Port_Config_CoopP2JoinEnabled())) {
@@ -743,8 +799,10 @@ void Port_Coop_FrameTick(void) {
         return;
     }
 
-    if (!P2Linked()) {
-        /* An area load erased the entity lists (and player 2 with them). */
+    if (!P2Linked() || sP2Rescue) {
+        /* An area load erased the entity lists (and player 2 with them), or
+         * player 2 tried to leave the room on its own (CancelP2Exit). */
+        sP2Rescue = 0;
         SpawnP2();
     } else if (gRoomControls.area != sLastArea || gRoomControls.room != sLastRoom) {
         FollowP1();
@@ -768,7 +826,11 @@ void Port_Coop_FrameTick(void) {
          * waiting on it forever. */
         const int p2InEvent = !sHidden && p2->updatePriority > PRIO_PLAYER &&
                               p2->updatePriority >= gPriorityHandler.event_priority;
-        if (busy && !p2InEvent) {
+        /* The area-name banner freezes the world (control off, top
+         * priority) but isn't a cutscene: player 2 stays on screen, frozen
+         * like player 1. */
+        const int banner = !sHidden && AreaBannerActive();
+        if (busy && !p2InEvent && !banner) {
             if (!sHidden) {
                 sHidden = 1;
                 sHiddenDraw = p2->spriteSettings.draw;
@@ -798,9 +860,26 @@ void Port_Coop_FrameTick(void) {
             SpawnP2();
             return;
         }
+        if (busy)
+            return; /* banner / player 2's own event: nothing else to do */
         /* Leash, player 1's side: walked off further than a screen away,
          * player 2 is brought along. */
         if (Apart(p2->x.HALF.HI, p2->y.HALF.HI, LEASH_PULL_X, LEASH_PULL_Y))
             FollowP1();
+        /* Watchdog: player 2 stuck falling / in lava / drowning / waiting to
+         * respawn for 5 s (a boss arena's lava, a pit with no ground) comes
+         * back beside player 1. */
+        {
+            static int sStuck;
+            const u8 a = p2->action;
+            if (a == PLAYER_FALL || a == PLAYER_LAVA || a == PLAYER_DROWN || a == PLAYER_080728AC) {
+                if (++sStuck > 300) {
+                    sStuck = 0;
+                    SpawnP2();
+                }
+            } else {
+                sStuck = 0;
+            }
+        }
     }
 }

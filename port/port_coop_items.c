@@ -29,7 +29,18 @@
 #include "port_coop.h"
 
 #define COOP_FILENAME "tmc.coop"
-static const char kMagic[6] = { 'T', 'M', 'C', 'O', 'P', '1' };
+/* v2: per save slot — was player 2 in the game when the slot was saved,
+ * and its A/B. (v1 held one A/B pair; it is read as slot 1's.) */
+static const char kMagic[6] = { 'T', 'M', 'C', 'O', 'P', '2' };
+static const char kMagicV1[6] = { 'T', 'M', 'C', 'O', 'P', '1' };
+#define COOP_SLOTS 3
+
+typedef struct {
+    u8 joined;
+    u8 equip[2];
+} CoopSlot;
+static CoopSlot sSlots[COOP_SLOTS];
+static int sSlot = -1; /* the save slot sEquip belongs to */
 
 static u8 sEquip[2];   /* player 2's SLOT_A, SLOT_B */
 static u8 sSavedP1[2]; /* player 1's, while player 2's are swapped in */
@@ -40,12 +51,22 @@ static int sSwapped;
 static int sMenuP2;
 static int sMenuWait;
 
+static int CurrentSlot(void) {
+    const int slot = gSaveHeader->saveFileId;
+    return slot >= 0 && slot < COOP_SLOTS ? slot : 0;
+}
+
 static void Save(void) {
-    FILE* f = fopen(COOP_FILENAME ".tmp", "wb");
+    FILE* f;
     int ok;
+    if (sSlot >= 0) {
+        sSlots[sSlot].equip[0] = sEquip[0];
+        sSlots[sSlot].equip[1] = sEquip[1];
+    }
+    f = fopen(COOP_FILENAME ".tmp", "wb");
     if (!f)
         return;
-    ok = fwrite(kMagic, 1, sizeof(kMagic), f) == sizeof(kMagic) && fwrite(sEquip, 1, sizeof(sEquip), f) == sizeof(sEquip);
+    ok = fwrite(kMagic, 1, sizeof(kMagic), f) == sizeof(kMagic) && fwrite(sSlots, 1, sizeof(sSlots), f) == sizeof(sSlots);
     if (fclose(f) != 0)
         ok = 0;
     if (ok)
@@ -56,23 +77,53 @@ static void Save(void) {
     }
 }
 
-static void Load(void) {
+static void LoadFile(void) {
     FILE* f;
     char magic[sizeof(kMagic)];
+    int i;
     sLoaded = 1;
+    for (i = 0; i < COOP_SLOTS; i++)
+        sSlots[i].joined = 0, sSlots[i].equip[0] = sSlots[i].equip[1] = 0xff; /* 0xff = never chosen */
     f = fopen(COOP_FILENAME, "rb");
-    if (!f) {
-        /* First time: start with player 1's choice. */
-        sEquip[0] = gSave.stats.equipped[SLOT_A];
-        sEquip[1] = gSave.stats.equipped[SLOT_B];
+    if (!f)
         return;
-    }
-    if (fread(magic, 1, sizeof(magic), f) != sizeof(magic) || memcmp(magic, kMagic, sizeof(magic)) != 0 ||
-        fread(sEquip, 1, sizeof(sEquip), f) != sizeof(sEquip)) {
-        sEquip[0] = gSave.stats.equipped[SLOT_A];
-        sEquip[1] = gSave.stats.equipped[SLOT_B];
+    if (fread(magic, 1, sizeof(magic), f) == sizeof(magic)) {
+        if (memcmp(magic, kMagic, sizeof(magic)) == 0) {
+            if (fread(sSlots, 1, sizeof(sSlots), f) != sizeof(sSlots))
+                for (i = 0; i < COOP_SLOTS; i++)
+                    sSlots[i].joined = 0, sSlots[i].equip[0] = sSlots[i].equip[1] = 0xff;
+        } else if (memcmp(magic, kMagicV1, sizeof(magic)) == 0) {
+            u8 old[2];
+            if (fread(old, 1, sizeof(old), f) == sizeof(old))
+                sSlots[0].equip[0] = old[0], sSlots[0].equip[1] = old[1];
+        }
     }
     fclose(f);
+}
+
+/* Player 2's A/B for the save slot in play (switching files switches them). */
+static void Load(void) {
+    const int slot = CurrentSlot();
+    if (!sLoaded)
+        LoadFile();
+    if (slot == sSlot)
+        return;
+    sSlot = slot;
+    if (sSlots[slot].equip[0] == 0xff && sSlots[slot].equip[1] == 0xff) {
+        /* Never chosen for this file: start with player 1's choice. */
+        sEquip[0] = gSave.stats.equipped[SLOT_A];
+        sEquip[1] = gSave.stats.equipped[SLOT_B];
+    } else {
+        sEquip[0] = sSlots[slot].equip[0];
+        sEquip[1] = sSlots[slot].equip[1];
+    }
+}
+
+/* Was player 2 in the game when this save slot was last saved? */
+int Port_CoopItems_SlotJoined(void) {
+    if (!sLoaded)
+        LoadFile();
+    return sSlots[CurrentSlot()].joined;
 }
 
 /* Is item (as stored in an equip slot) still owned? Bottles and the
@@ -87,8 +138,7 @@ static int Owned(u8 item) {
 }
 
 void Port_CoopItems_Enter(void) {
-    if (!sLoaded)
-        Load();
+    Load();
     if (sSwapped || sMenuP2)
         return;
     sSwapped = 1;
@@ -156,6 +206,17 @@ void Port_CoopItems_FrameTick(void) {
 /* WriteSaveFile hook: saving from player 2's menu must not store player
  * 2's A/B as player 1's. Returns 1 and fills *out with the image to write. */
 int Port_CoopItems_SaveImage(const SaveFile* in, SaveFile* out) {
+    /* The game is being saved: remember whether player 2 is along, so
+     * loading this file brings player 2 back (port_coop.c). */
+    {
+        const int slot = CurrentSlot();
+        if (!sLoaded)
+            LoadFile();
+        if (sSlots[slot].joined != (u8)(Port_Coop_IsP2Active() != 0)) {
+            sSlots[slot].joined = (u8)(Port_Coop_IsP2Active() != 0);
+            Save();
+        }
+    }
     if (!sMenuP2 && !sSwapped)
         return 0;
     *out = *in;
@@ -165,8 +226,7 @@ int Port_CoopItems_SaveImage(const SaveFile* in, SaveFile* out) {
 }
 
 unsigned char Port_CoopItems_Equipped(int slot) {
-    if (!sLoaded)
-        Load();
+    Load();
     if (slot != 0 && slot != 1)
         return 0;
     if (sSwapped || sMenuP2)
