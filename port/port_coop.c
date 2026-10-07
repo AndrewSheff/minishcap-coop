@@ -829,7 +829,7 @@ void Port_Coop_FrameTick(void) {
         /* Player 1 is in a cutscene, dialogue, item get, portal, transition:
          * player 2 is put away (not updated, drawn or hit) until it ends. */
         const int busy = p1s->controlMode != CONTROL_ENABLED || (gMessage.state & MESSAGE_ACTIVE) ||
-                         gPriorityHandler.event_priority != 0 || (p1s->flags & PL_USE_PORTAL) ||
+                         gPriorityHandler.event_priority != 0 || (p1s->flags & (PL_USE_PORTAL | PL_IN_MINECART)) ||
                          (p1->action != PLAYER_NORMAL && p1->action != PLAYER_MINISH && p1->action != PLAYER_ROLL &&
                           p1->action != PLAYER_JUMP && p1->action != PLAYER_PUSH && p1->action != PLAYER_PULL &&
                           p1->action != PLAYER_BOUNCE);
