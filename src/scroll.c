@@ -118,15 +118,24 @@ void Scroll1(RoomControls* controls) {
 #endif
 
     if (controls->camera_target != NULL) {
+        s32 focusX = controls->camera_target->x.HALF.HI;
+        s32 focusY = controls->camera_target->y.HALF.HI;
+#ifdef PC_PORT
+        {
+            /* Coop: frame both Links while they play freely (port_coop.c). */
+            extern void Port_Coop_CameraFocus(const Entity* target, s32* x, s32* y);
+            Port_Coop_CameraFocus(controls->camera_target, &focusX, &focusY);
+        }
+#endif
         // Scroll in x direction.
         unused = controls->scroll_x;
 #if MODE1_GBA_WIDTH > 240
         /* Pre-clamped rest target: a camera parked past the live clamp
          * (room entry, view-width change) pans back instead of deadlocking
          * against the right-edge gate. */
-        targetValue = Port_Widescreen_CameraRestX(controls->camera_target->x.HALF.HI);
+        targetValue = Port_Widescreen_CameraRestX(focusX);
 #else
-        targetValue = controls->camera_target->x.HALF.HI - 0x78;
+        targetValue = focusX - 0x78;
 #endif
         diff = controls->scroll_x - targetValue;
         if (diff != 0) {
@@ -172,7 +181,7 @@ void Scroll1(RoomControls* controls) {
 
         // Scroll in y direction.
         unused = controls->scroll_y;
-        targetValue = controls->camera_target->y.HALF.HI - 0x50;
+        targetValue = focusY - 0x50;
         diff = controls->scroll_y - (targetValue);
         if (diff != 0) {
             uVar5 = controls->scroll_y & 7;
