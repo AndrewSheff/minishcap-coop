@@ -104,7 +104,17 @@ static unsigned char* OwnerSlot(const void* entity) {
     return NULL;
 }
 
+static int SeparateHearts(void) {
+    return sP2Active && !Port_Config_CoopSharedHearts();
+}
+
 static void SetCurrent(int idx) {
+    /* Separate hearts: gSave.stats.health is "the current player's"
+     * health, like the other per-player globals. */
+    if (idx != sCurrent && SeparateHearts() && gPortCoopState.healthInit) {
+        gPortCoopState.health[sCurrent] = gSave.stats.health;
+        gSave.stats.health = gPortCoopState.health[idx];
+    }
     sCurrent = idx;
     gPortCurPlayerEntity = &gPortPlayerEntities[idx];
     gPortCurPlayerState = &gPortPlayerStates[idx];
@@ -466,6 +476,14 @@ static void MirrorInteractions(void) {
     }
 }
 
+/* HUD (src/ui.c): player 2's own health, when hearts are separate. */
+int Port_Coop_P2Health(int* health) {
+    if (!SeparateHearts() || !gPortCoopState.healthInit)
+        return 0;
+    *health = sCurrent == 1 ? gSave.stats.health : gPortCoopState.health[1];
+    return 1;
+}
+
 int Port_Coop_P2InPlay(void) {
     return sP2Active && !sHidden;
 }
@@ -725,6 +743,17 @@ static void SpawnP2As(int minish) {
     PlayerRoomStatus saved = gRoomTransition.player_status;
     s16 x, y;
 
+    /* Separate hearts: player 2's health is set before its spawn reads
+     * gSave.stats.health (InitializePlayer -> entity health). */
+    if (!gPortCoopState.healthInit) {
+        const int slotHp = Port_CoopItems_SlotHealth();
+        gPortCoopState.health[0] = gSave.stats.health;
+        gPortCoopState.health[1] =
+            (u8)(slotHp > 0 && slotHp <= gSave.stats.maxHealth ? slotHp : gSave.stats.maxHealth);
+        gPortCoopState.healthInit = 1;
+    }
+    sP2Active = 1;
+
     ReleaseP2();
     UnlinkP2();
     if (minish) {
@@ -811,6 +840,8 @@ void Port_Coop_FrameTick(void) {
     if (!GameplayLive()) {
         if (gMain.task != TASK_GAME) {
             sP2Active = 0; /* back at the title / file select */
+            gPortCoopState.healthInit = 0;
+            gPortCoopState.koTimer = 0;
             sSessionChecked = 0;
             sLastArea = sLastRoom = 0xff;
         }
@@ -868,6 +899,37 @@ void Port_Coop_FrameTick(void) {
     }
     sLastArea = gRoomControls.area;
     sLastRoom = gRoomControls.room;
+
+    /* Separate hearts: player 2 at zero hearts is knocked out — no game
+     * over (that is player 1's) — and is back beside player 1 after 3 s with
+     * half its hearts. Its death sequence is cut off here, before it can
+     * end the game. */
+    if (SeparateHearts() && gPortCoopState.healthInit) {
+        Entity* p2 = P2;
+        if (gPortCoopState.koTimer > 0) {
+            if (--gPortCoopState.koTimer == 0) {
+                int hp = (gSave.stats.maxHealth / 2) & ~7;
+                gPortCoopState.health[1] = (u8)(hp < 8 ? 8 : hp);
+                SpawnP2();
+            }
+            return;
+        }
+        if (gPortCoopState.health[1] == 0) {
+            gPortCoopState.koTimer = 180;
+            sHidden = 1;
+            sHiddenDraw = 1;
+            p2->spriteSettings.draw = 0;
+            COLLISION_OFF(p2);
+            /* Its death started a player event (world freeze): end it unless
+             * player 1 is in one of its own. */
+            p2->updatePriority = PRIO_PLAYER;
+            if (gPriorityHandler.event_priority == PRIO_PLAYER_EVENT &&
+                gPortPlayerEntities[0].base.updatePriority < PRIO_PLAYER_EVENT)
+                gPriorityHandler.event_priority = PRIO_MIN;
+            fprintf(stderr, "[coop] player 2 knocked out\n");
+            return;
+        }
+    }
 
     {
         const Entity* p1 = &gPortPlayerEntities[0].base;

@@ -27,6 +27,13 @@ typedef struct PortCoopState {
     unsigned char ownerEntities[MAX_ENTITIES];
     unsigned char ownerAux[MAX_AUX_PLAYER_ENTITIES];
     unsigned char focus[MAX_ENTITIES];
+    /* Separate hearts (config coop_shared_hearts = false): each player's
+     * health; the one not "current" is kept here, the current one is in
+     * gSave.stats.health. */
+    unsigned char health[2];
+    unsigned char healthInit;
+    unsigned char pad2;
+    int koTimer; /* player 2 knocked out: frames until it is back */
 } PortCoopState;
 extern PortCoopState gPortCoopState;
 #endif
@@ -63,6 +70,8 @@ void Port_CoopItems_OnPauseMenuOpen(void);
 int Port_CoopItems_MenuIsP2(void);
 void Port_CoopItems_FrameTick(void);
 int Port_CoopItems_SlotJoined(void);
+int Port_CoopItems_SlotHealth(void);
+int Port_Coop_P2Health(int* health);
 void Port_CoopItems_Leave(void);
 unsigned char Port_CoopItems_Equipped(int slot);
 

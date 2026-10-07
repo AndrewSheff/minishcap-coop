@@ -336,6 +336,7 @@ void Port_Config_TestForceEdge(PortInput input);
 bool Port_Config_InputPressedP2(PortInput input);
 void Port_Config_TestForceEdgeP2(PortInput input);
 bool Port_Config_CoopP2JoinEnabled(void);
+bool Port_Config_CoopSharedHearts(void);
 
 /* Production edge-stamp used by the touch overlay: latch a button press onto
  * the per-frame edge cache so a sub-frame tap (pointer DOWN+UP in one poll

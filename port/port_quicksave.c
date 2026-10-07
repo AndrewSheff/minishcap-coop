@@ -132,7 +132,7 @@ static StateRegion sRegions[] = {
 #define NUM_AUTO_SLOTS 3
 #define MAGIC 0x53434D54u /* "TMCS" little-endian */
 #define VERSION                                         \
-    9u /* v2: header carries gEntities base address for \
+    10u /* v2: header carries gEntities base address for \
         * cross-process pointer-fixup on restore.       \
         * v3: gRand added to region list so RNG         \
         * state round-trips (GBA had it in IWRAM).      \
@@ -148,7 +148,8 @@ static StateRegion sRegions[] = {
         * v7 is also the first with gSave.flags at the  \
         * retail 0x25C; v6 may hold the old PC layout. \
         * v8: coop — every player's state is captured.  \
-        * v9: coop state (player 2 joined / owners).    */
+        * v9: coop state (player 2 joined / owners).    \
+        * v10: coop state carries player 2's health.     */
 
 typedef struct {
     u8* snapshot; /* heap, NULL if slot empty */

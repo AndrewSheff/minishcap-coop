@@ -169,9 +169,58 @@ void sub_0801C2F0(u32 dest, u32 param_2) {
     DmaCopy32(3, gUnk_085C4620 + (onesDigit + 10) * 0x8, dest + 0x20, 0x8 * 4);
 }
 
+#ifdef PC_PORT
+/* Coop player 2's own hearts (separate hearts, port_coop.c): the game's
+ * heart tiles on the HUD layer, top row next to player 1's (columns 12-21,
+ * a second row past 10 hearts), its A/B buttons below them. */
+#define P2_HEARTS_COL 12
+static void DrawHeartsP2(void) {
+    extern int Port_Coop_P2Health(int* health);
+    extern int Port_Coop_HudVisible(void);
+    s32 hp = 0, quarters, max, full, i;
+    u8 changed = 0;
+    u16* rows[2] = { &gBG0Buffer[0x20 + P2_HEARTS_COL], &gBG0Buffer[0x40 + P2_HEARTS_COL] };
+    static u8 sOwned; /* these cells hold player 2's hearts (never touched otherwise) */
+    const int shown =
+        Port_Coop_HudVisible() && Port_Coop_P2Health(&hp) && (gHUD.hideFlags & HUD_HIDE_HEARTS) == 0;
+
+    if (!shown && !sOwned)
+        return;
+    sOwned = (u8)shown;
+
+    max = gSave.stats.maxHealth / 2; /* quarter hearts, as DrawHearts */
+    quarters = hp / 2;
+    if (quarters > max)
+        quarters = max;
+    full = quarters / 4;
+    /* Written every frame (compared first): other code clears the HUD layer
+     * (room loads, hidden HUD), and this redraws on the next frame. */
+    for (i = 0; i < 20; i++) {
+        u16 tile = 0;
+        if (shown && i < max / 4) {
+            if (i < full)
+                tile = gUnk_080C8F2C[9]; /* full heart, as DrawHearts' table */
+            else if (i == full && (quarters & 3) != 0)
+                tile = ((quarters & 3) + 0x11) | 0xf000; /* part heart */
+            else
+                tile = gUnk_080C8F2C[10]; /* empty heart */
+        }
+        if (rows[i / 10][i % 10] != tile) {
+            rows[i / 10][i % 10] = tile;
+            changed = 1;
+        }
+    }
+    if (changed)
+        gScreen.bg0.updated = 1;
+}
+#endif
+
 void DrawUI(void) {
     gHUD.unk_0 &= ~gHUD.hideFlags;
     DrawHearts();
+#ifdef PC_PORT
+    DrawHeartsP2();
+#endif
     DrawChargeBar();
     DrawRupees();
     DrawKeys();
@@ -952,12 +1001,12 @@ void EzloNagUIElement_Action2(UIElement* element) {
  */
 UIElementDefinition gUIElementDefinitions[15];
 
-/* Coop player 2's A/B, under the hearts on the left: the game's own button
+/* Coop player 2's A/B, under its hearts (top middle): the game's own button
  * and item-icon sprites (names nowhere — the pause menu shows those from the
  * ROM). Item tiles go to the second half of player 2's VRAM slot
  * (Port_Coop_HudTileBase), so they never collide with player 1's HUD. */
-#define P2_HUD_BUTTON_B_X 0x10
-#define P2_HUD_BUTTON_A_X 0x28
+#define P2_HUD_BUTTON_B_X 0x68 /* under player 2's hearts (DrawHeartsP2) */
+#define P2_HUD_BUTTON_A_X 0x80
 #define P2_HUD_BUTTON_Y 0x2a
 
 extern int Port_Coop_HudVisible(void);

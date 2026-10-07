@@ -29,15 +29,18 @@
 #include "port_coop.h"
 
 #define COOP_FILENAME "tmc.coop"
-/* v2: per save slot — was player 2 in the game when the slot was saved,
- * and its A/B. (v1 held one A/B pair; it is read as slot 1's.) */
-static const char kMagic[6] = { 'T', 'M', 'C', 'O', 'P', '2' };
+/* v3: per save slot — was player 2 in the game when the slot was saved,
+ * its A/B and its health (separate hearts). v2 lacked the health; v1 held
+ * one A/B pair, read as slot 1's. */
+static const char kMagic[6] = { 'T', 'M', 'C', 'O', 'P', '3' };
+static const char kMagicV2[6] = { 'T', 'M', 'C', 'O', 'P', '2' };
 static const char kMagicV1[6] = { 'T', 'M', 'C', 'O', 'P', '1' };
 #define COOP_SLOTS 3
 
 typedef struct {
     u8 joined;
     u8 equip[2];
+    u8 health; /* 0 = full */
 } CoopSlot;
 static CoopSlot sSlots[COOP_SLOTS];
 static int sSlot = -1; /* the save slot sEquip belongs to */
@@ -83,7 +86,7 @@ static void LoadFile(void) {
     int i;
     sLoaded = 1;
     for (i = 0; i < COOP_SLOTS; i++)
-        sSlots[i].joined = 0, sSlots[i].equip[0] = sSlots[i].equip[1] = 0xff; /* 0xff = never chosen */
+        sSlots[i].joined = 0, sSlots[i].health = 0, sSlots[i].equip[0] = sSlots[i].equip[1] = 0xff; /* 0xff = never chosen */
     f = fopen(COOP_FILENAME, "rb");
     if (!f)
         return;
@@ -92,6 +95,11 @@ static void LoadFile(void) {
             if (fread(sSlots, 1, sizeof(sSlots), f) != sizeof(sSlots))
                 for (i = 0; i < COOP_SLOTS; i++)
                     sSlots[i].joined = 0, sSlots[i].equip[0] = sSlots[i].equip[1] = 0xff;
+        } else if (memcmp(magic, kMagicV2, sizeof(magic)) == 0) {
+            u8 old[COOP_SLOTS][3];
+            if (fread(old, 1, sizeof(old), f) == sizeof(old))
+                for (i = 0; i < COOP_SLOTS; i++)
+                    sSlots[i].joined = old[i][0], sSlots[i].equip[0] = old[i][1], sSlots[i].equip[1] = old[i][2];
         } else if (memcmp(magic, kMagicV1, sizeof(magic)) == 0) {
             u8 old[2];
             if (fread(old, 1, sizeof(old), f) == sizeof(old))
@@ -124,6 +132,13 @@ int Port_CoopItems_SlotJoined(void) {
     if (!sLoaded)
         LoadFile();
     return sSlots[CurrentSlot()].joined;
+}
+
+/* Player 2's health when this save slot was last saved (0 = full). */
+int Port_CoopItems_SlotHealth(void) {
+    if (!sLoaded)
+        LoadFile();
+    return sSlots[CurrentSlot()].health;
 }
 
 /* Is item (as stored in an equip slot) still owned? Bottles and the
@@ -212,8 +227,13 @@ int Port_CoopItems_SaveImage(const SaveFile* in, SaveFile* out) {
         const int slot = CurrentSlot();
         if (!sLoaded)
             LoadFile();
-        if (sSlots[slot].joined != (u8)(Port_Coop_IsP2Active() != 0)) {
-            sSlots[slot].joined = (u8)(Port_Coop_IsP2Active() != 0);
+        int hp = 0;
+        const u8 joined = (u8)(Port_Coop_IsP2Active() != 0);
+        if (!Port_Coop_P2Health(&hp))
+            hp = 0;
+        if (sSlots[slot].joined != joined || sSlots[slot].health != (u8)hp) {
+            sSlots[slot].joined = joined;
+            sSlots[slot].health = (u8)hp;
             Save();
         }
     }

@@ -268,6 +268,8 @@ std::array<bool, PORT_INPUT_COUNT> sEdgePressedP2{};
  * "first" = the first (or only) pad does, "none" = player 2 is keyboard-only. */
 std::string sP2Gamepad = "auto";
 bool sCoopP2Join = true;
+/* true = one shared heart bar (the old prototype); false = each Link its own. */
+bool sCoopSharedHearts = false;
 std::vector<SDL_Gamepad*> sPads;
 std::filesystem::path sConfigPath = "config.json";
 nlohmann::json sConfigJson;
@@ -317,6 +319,7 @@ struct ScaleCfg {
 const BoolCfg kBoolCfg[] = {
     { "port_settings_menu", &sPortSettingsMenuEnabled, true },
     { "coop_p2_join", &sCoopP2Join, true },
+    { "coop_shared_hearts", &sCoopSharedHearts, false },
     { "autosave_enabled", &sAutosaveEnabled, true },
 #ifdef __ANDROID__
     { "widescreen_enabled", &sWidescreenEnabled, false },
@@ -1565,6 +1568,10 @@ extern "C" void Port_Config_TestForceEdgeP2(PortInput input) {
 
 extern "C" bool Port_Config_CoopP2JoinEnabled(void) {
     return sCoopP2Join;
+}
+
+extern "C" bool Port_Config_CoopSharedHearts(void) {
+    return sCoopSharedHearts;
 }
 
 /* Coop player 2's buttons: its keyboard binds (p2_bindings), its edge cache,
