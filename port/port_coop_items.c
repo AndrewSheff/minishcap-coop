@@ -94,17 +94,22 @@ void Port_CoopItems_Enter(void) {
     sSwapped = 1;
     sSavedP1[0] = gSave.stats.equipped[SLOT_A];
     sSavedP1[1] = gSave.stats.equipped[SLOT_B];
-    gSave.stats.equipped[SLOT_A] = Owned(sEquip[0]) ? sEquip[0] : ITEM_NONE;
-    gSave.stats.equipped[SLOT_B] = Owned(sEquip[1]) ? sEquip[1] : ITEM_NONE;
+    /* The ocarina warps the whole party (world event): player 1's. On
+     * player 2's buttons it stays inert. */
+    gSave.stats.equipped[SLOT_A] = Owned(sEquip[0]) && sEquip[0] != ITEM_OCARINA ? sEquip[0] : ITEM_NONE;
+    gSave.stats.equipped[SLOT_B] = Owned(sEquip[1]) && sEquip[1] != ITEM_OCARINA ? sEquip[1] : ITEM_NONE;
 }
 
 void Port_CoopItems_Leave(void) {
     if (!sSwapped || sMenuP2)
         return; /* player 2's menu keeps player 2's choice in place */
     sSwapped = 0;
-    /* Keep what player 2's code changed (lantern on/off, emptied bottle). */
-    sEquip[0] = gSave.stats.equipped[SLOT_A];
-    sEquip[1] = gSave.stats.equipped[SLOT_B];
+    /* Keep what player 2's code changed (lantern on/off, emptied bottle);
+     * an inert ocarina slot stays the ocarina. */
+    if (sEquip[0] != ITEM_OCARINA)
+        sEquip[0] = gSave.stats.equipped[SLOT_A];
+    if (sEquip[1] != ITEM_OCARINA)
+        sEquip[1] = gSave.stats.equipped[SLOT_B];
     gSave.stats.equipped[SLOT_A] = sSavedP1[0];
     gSave.stats.equipped[SLOT_B] = sSavedP1[1];
 }
