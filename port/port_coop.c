@@ -938,6 +938,24 @@ static int AreaBannerActive(void) {
     return 0;
 }
 
+/* A minigame run by player 1 is on: Anju's cucco roundup (its CUCCO_MINIGAME
+ * object lives only while the timer runs). Player 2 is put away for it —
+ * the angry cuccos would chase it and the result is player 1's. */
+static int MinigameActive(void) {
+    int i;
+    for (i = 0; i < 9; i++) {
+        LinkedList* list = &gEntityLists[i];
+        Entity* e = list->first;
+        int steps = 0;
+        while (e != NULL && e != (Entity*)list && steps++ < 96) {
+            if (e->kind == OBJECT && e->id == CUCCO_MINIGAME)
+                return 1;
+            e = e->next;
+        }
+    }
+    return 0;
+}
+
 static int GameplayLive(void) {
     const Entity* p1 = &gPortPlayerEntities[0].base;
     return gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN &&
@@ -1095,7 +1113,8 @@ void Port_Coop_FrameTick(void) {
                          gPriorityHandler.event_priority != 0 || (p1s->flags & (PL_USE_PORTAL | PL_IN_MINECART)) ||
                          (p1->action != PLAYER_NORMAL && p1->action != PLAYER_MINISH && p1->action != PLAYER_ROLL &&
                           p1->action != PLAYER_JUMP && p1->action != PLAYER_PUSH && p1->action != PLAYER_PULL &&
-                          p1->action != PLAYER_BOUNCE);
+                          p1->action != PLAYER_BOUNCE) ||
+                         MinigameActive();
         /* ...unless player 2 is the one taking part in the event (its update
          * priority raised for it): putting it away would leave the event
          * waiting on it forever. */

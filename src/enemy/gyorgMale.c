@@ -1045,8 +1045,8 @@ void sub_08047D88(GyorgMaleEntity* this) {
 
 #ifdef PC_PORT
 /* Coop: the other Link can ride Gyorg too — when it stands on the boss it is
- * carried by the boss's movement each frame (port_coop.c). The turn that
- * swings player 1 around the boss's centre is not repeated for it. */
+ * carried by the boss's movement each frame (port_coop.c), and swung around
+ * the boss's centre by its turns like player 1 (CoopTurnOther). */
 extern int Port_Coop_PushOtherPlayer(void);
 extern void Port_Coop_PopPlayer(int prev);
 static int CoopOtherOnBoard(GyorgMaleEntity* this) {
@@ -1068,9 +1068,28 @@ static void CoopCarryOther(GyorgMaleEntity* this, int onBoard, u32 oldX, u32 old
     if (onBoard)
         Port_Coop_CarryOtherPlayer((s32)super->x.HALF.HI - (s32)oldX, (s32)super->y.HALF.HI - (s32)oldY);
 }
+u32 sub_08047F68(GyorgMaleEntity* this);
+static void CoopTurnOther(GyorgMaleEntity* this, s32 turn) {
+    const int prev = Port_Coop_PushOtherPlayer();
+    if (prev < 0)
+        return;
+    if (super->animIndex != 1 && gPlayerEntity.base.z.HALF.HI == 0 &&
+        EntityWithinDistance(super, gPlayerEntity.base.x.HALF.HI, gPlayerEntity.base.y.HALF.HI, 0x20) &&
+        PlayerCanBeMoved()) {
+        u32 radius = sub_08047F68(this) << 8;
+        u32 dir = CalculateDirectionFromOffsets(gPlayerEntity.base.x.HALF.HI - super->x.HALF.HI,
+                                                gPlayerEntity.base.y.HALF.HI - super->y.HALF.HI);
+        s32 to = (dir - (turn / 256)) & 0xFF;
+        gPlayerEntity.base.x.WORD += (gSineTable[to] - gSineTable[dir]) * radius;
+        gPlayerEntity.base.y.WORD -= (gSineTable[to + 0x40] - gSineTable[dir + 0x40]) * radius;
+    }
+    Port_Coop_PopPlayer(prev);
+}
+#define COOP_TURN_OTHER(turn) CoopTurnOther(this, turn)
 #define COOP_RIDE_BEGIN() const int coopOnBoard = CoopOtherOnBoard(this)
 #define COOP_RIDE_END() CoopCarryOther(this, coopOnBoard, oldX, oldY)
 #else
+#define COOP_TURN_OTHER(turn)
 #define COOP_RIDE_BEGIN()
 #define COOP_RIDE_END()
 #endif
@@ -1123,6 +1142,7 @@ void sub_08047EA4(GyorgMaleEntity* this, u32 unk1) {
     tmp = this->unk_78 - this->unk_7a;
     if (tmp + 0x100 < 0x200u)
         return;
+    COOP_TURN_OTHER(tmp);
     if (this->unk_7c & 1) {
         tmp2 = sub_08047F68(this) << 8;
         dir = CalculateDirectionFromOffsets(gPlayerEntity.base.x.HALF.HI - super->x.HALF.HI,
