@@ -66,6 +66,15 @@
 
 #define kFallDamage 2
 
+#ifdef PC_PORT
+/* Coop: player 1 keeps the fixed VRAM slot 2; player 2 takes a free slot so
+ * the two Links don't overwrite each other's animation tiles (port_coop.c). */
+extern u32 Port_Coop_PlayerGfxSlot(Entity* player);
+#define PLAYER_GFX_SLOT(player) Port_Coop_PlayerGfxSlot(player)
+#else
+#define PLAYER_GFX_SLOT(player) 2
+#endif
+
 typedef void(PlayerEntityAction)(PlayerEntity*);
 
 static PlayerEntityAction PlayerInit;
@@ -408,7 +417,7 @@ static void PlayerInit(PlayerEntity* this) {
         gPlayerState.animation = ANIM_DEFAULT;
     }
     sub_0806FDA0(super);
-    LoadSwapGFX(super, 1, 2);
+    LoadSwapGFX(super, 1, PLAYER_GFX_SLOT(super));
     InitAnimationForceUpdate(super, 2);
     if (super->collisionLayer == 0) {
         ResolveCollisionLayer(super);
@@ -3284,7 +3293,7 @@ static void sub_08073C80(PlayerEntity* this) {
     super->subtimer = 2;
     super->knockbackDuration = 0;
     super->subAction = 1;
-    LoadSwapGFX(super, 1, 2);
+    LoadSwapGFX(super, 1, PLAYER_GFX_SLOT(super));
     gRoomControls.camera_target = super;
     sub_080809D4();
     if (gRoomTransition.player_status.spawn_type == PL_SPAWN_9) {

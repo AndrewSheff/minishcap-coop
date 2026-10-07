@@ -210,6 +210,26 @@ void Port_CoopTest_Tick(unsigned int frame) {
         }
     }
 
+    /* ponytail: debug knob — TMC_COOP_TEST_THEN=<preset>@<frame> jumps to a
+     * second preset mid-run (area changes in headless tests). */
+    {
+        static int thenIdx = -2;
+        static unsigned int thenFrame;
+        if (thenIdx == -2) {
+            const char* t = getenv("TMC_COOP_TEST_THEN");
+            const char* at = t ? strchr(t, '@') : NULL;
+            thenIdx = -1;
+            if (at) {
+                char name[64];
+                snprintf(name, sizeof(name), "%.*s", (int)(at - t), t);
+                thenIdx = FindPreset(name);
+                thenFrame = (unsigned int)strtoul(at + 1, NULL, 0);
+            }
+        }
+        if (thenIdx >= 0 && frame >= thenFrame && Port_CoopTest_Go(thenIdx))
+            thenIdx = -1;
+    }
+
     if (sPending >= 0) {
         if (gMain.task == TASK_TITLE && frame >= 30 && (frame & 0xF) < 3)
             Port_Config_TestForceEdge(PORT_INPUT_START);

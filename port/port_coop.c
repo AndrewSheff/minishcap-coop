@@ -84,6 +84,10 @@ static void SetCurrent(int idx) {
     gPortCurCarriedEntity = &gPortCarriedEntities[idx];
 }
 
+u32 Port_Coop_PlayerGfxSlot(Entity* player) {
+    return player == P2 ? 0 /* any free slot */ : 2;
+}
+
 int Port_Coop_CurrentPlayer(void) {
     return sCurrent;
 }
