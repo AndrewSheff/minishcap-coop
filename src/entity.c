@@ -1000,6 +1000,16 @@ bool32 EntityHasDuplicateID(Entity* ent) {
     return FALSE;
 }
 
+#ifdef PC_PORT
+/* Coop: a player's own items (bombs out, the boomerang, a sword beam...)
+ * are counted per player, so each Link keeps the game's limits for itself
+ * (port_coop.c). Other kinds are unaffected. */
+extern int Port_Coop_ItemIsMine(const Entity* entity);
+#define COOP_ITEM_MINE(e) ((e)->kind != PLAYER_ITEM || Port_Coop_ItemIsMine(e))
+#else
+#define COOP_ITEM_MINE(e) 1
+#endif
+
 Entity* FindEntityByID(u32 kind, u32 id, u32 listIndex) {
     Entity* it;
     LinkedList* list;
@@ -1013,7 +1023,7 @@ Entity* FindEntityByID(u32 kind, u32 id, u32 listIndex) {
 #else
     for (it = list->first; it != NULL && (intptr_t)it != (intptr_t)list; it = it->next) {
 #endif
-        if (kind == it->kind && id == it->id)
+        if (kind == it->kind && id == it->id && COOP_ITEM_MINE(it))
             return it;
     }
 #ifdef PC_PORT
@@ -1057,7 +1067,7 @@ Entity* FindNextDuplicateID(Entity* ent, int listIndex) {
 #else
     for (i = ent->next; i != NULL && (intptr_t)i != (intptr_t)list; i = i->next) {
 #endif
-        if (i->kind == ent->kind && i->id == ent->id)
+        if (i->kind == ent->kind && i->id == ent->id && COOP_ITEM_MINE(i))
             return i;
     }
 #ifdef PC_PORT

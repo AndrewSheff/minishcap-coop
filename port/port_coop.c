@@ -452,6 +452,15 @@ int Port_Coop_CheckPauseMenuP2(void) {
 
 static int P2Linked(void);
 
+/* FindEntityByID / FindNextDuplicateID for player items: only the current
+ * player's own (player 2's while player 2's code runs, the rest otherwise). */
+int Port_Coop_ItemIsMine(const Entity* entity) {
+    const int mine = sCurrent == 1 && !sFocusContext;
+    if (!sP2Active)
+        return 1;
+    return Port_Coop_IsPlayer2Entity(entity) == mine;
+}
+
 /* Player 2 itself, or an entity it spawned (sword, arrows, effects). */
 int Port_Coop_IsPlayer2Entity(const void* entity) {
     if (!sP2Active || entity == NULL)

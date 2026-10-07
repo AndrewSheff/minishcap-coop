@@ -267,6 +267,13 @@ std::array<bool, PORT_INPUT_COUNT> sEdgePressedP2{};
 /* p2_gamepad: "auto" = the second connected pad belongs to player 2,
  * "first" = the first (or only) pad does, "none" = player 2 is keyboard-only. */
 std::string sP2Gamepad = "auto";
+/* Which connected pad is whose, by SDL instance id (0 = none). Assigned as
+ * pads connect (OpenGamepad), cleared when they disconnect; a pad that
+ * connects later fills the empty role — player 1's first in "auto". So
+ * unplugging player 1's pad doesn't move player 2's pad to player 1, and
+ * plugging one back in restores player 1. */
+SDL_JoystickID sPadRoleP1 = 0;
+SDL_JoystickID sPadRoleP2 = 0;
 bool sCoopP2Join = true;
 /* true = one shared heart bar (the old prototype); false = each Link its own. */
 bool sCoopSharedHearts = false;
@@ -702,6 +709,16 @@ static SDL_Gamepad* OpenGamepad(SDL_JoystickID id) {
     SDL_Log("Gamepad %s: %s", pad ? "connected" : "open failed", SDL_GetGamepadNameForID(id));
     if (pad) {
         sPads.push_back(pad);
+        if (sP2Gamepad == "first") {
+            if (sPadRoleP2 == 0)
+                sPadRoleP2 = id;
+            else if (sPadRoleP1 == 0)
+                sPadRoleP1 = id;
+        } else if (sPadRoleP1 == 0) {
+            sPadRoleP1 = id;
+        } else if (sPadRoleP2 == 0 && sP2Gamepad != "none") {
+            sPadRoleP2 = id;
+        }
     }
     return pad;
 }
@@ -710,6 +727,10 @@ static void CloseGamepad(SDL_JoystickID id) {
     for (auto it = sPads.begin(); it != sPads.end(); ++it) {
         if (SDL_GetGamepadID(*it) == id) {
             SDL_Log("Gamepad disconnected: %s", SDL_GetGamepadName(*it));
+            if (sPadRoleP1 == id)
+                sPadRoleP1 = 0;
+            if (sPadRoleP2 == id)
+                sPadRoleP2 = 0;
             SDL_CloseGamepad(*it);
             sPads.erase(it);
             return;
@@ -1405,11 +1426,13 @@ static void PersistBinds(PortInput input) {
 /* The gamepad that belongs to coop player 2 (nullptr = none); see
  * sP2Gamepad. Player 1 reads every other pad. */
 static SDL_Gamepad* P2Pad(void) {
-    if (sP2Gamepad == "first")
-        return sPads.empty() ? nullptr : sPads[0];
-    if (sP2Gamepad == "none")
+    if (sP2Gamepad == "none" || sPadRoleP2 == 0)
         return nullptr;
-    return sPads.size() >= 2 ? sPads[1] : nullptr;
+    for (SDL_Gamepad* pad : sPads) {
+        if (SDL_GetGamepadID(pad) == sPadRoleP2)
+            return pad;
+    }
+    return nullptr;
 }
 
 static bool IsP2PadId(SDL_JoystickID id) {
