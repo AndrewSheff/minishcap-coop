@@ -316,6 +316,29 @@ void sub_0809264C(LavaPlatformEntity* this) {
     InitializeAnimation(super, super->animationState);
 }
 
+#ifdef PC_PORT
+/* Coop: the other Link rides this platform too (port_coop.c). */
+extern int Port_Coop_PushOtherPlayer(void);
+extern void Port_Coop_PopPlayer(int prev);
+extern void Port_Coop_CarryOtherPlayer(int dx, int dy);
+#define COOP_PLATFORM_BEGIN(check)                          \
+    const s16 coopX = super->x.HALF.HI, coopY = super->y.HALF.HI; \
+    int coopOther = 0;                                      \
+    {                                                       \
+        const int prev = Port_Coop_PushOtherPlayer();       \
+        if (prev >= 0) {                                    \
+            coopOther = (check);                            \
+            Port_Coop_PopPlayer(prev);                      \
+        }                                                   \
+    }
+#define COOP_PLATFORM_END()                                 \
+    if (coopOther)                                          \
+        Port_Coop_CarryOtherPlayer(super->x.HALF.HI - coopX, super->y.HALF.HI - coopY);
+#else
+#define COOP_PLATFORM_BEGIN(check)
+#define COOP_PLATFORM_END()
+#endif
+
 bool32 LavaPlatform_IsPlayerOnPlatform(LavaPlatformEntity* this) {
     if ((gPlayerState.flags & PL_MINISH) == 0 && EntityInRectRadius(super, &gPlayerEntity.base, 0x10, 0x10) &&
         PlayerCanBeMoved()) {
@@ -330,7 +353,9 @@ bool32 LavaPlatform_IsPlayerOnPlatform(LavaPlatformEntity* this) {
 }
 
 void sub_080926E4(LavaPlatformEntity* this) {
+    COOP_PLATFORM_BEGIN(LavaPlatform_IsPlayerOnPlatform(this))
     SyncPlayerToPlatform(super, super->subtimer);
+    COOP_PLATFORM_END()
     if (super->action == 1) {
         (super->parent)->x.HALF.HI = super->x.HALF.HI;
         (super->parent)->y.HALF.HI = super->y.HALF.HI;
