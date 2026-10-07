@@ -1782,6 +1782,21 @@ void UpdateCarriedObject(void) {
     if ((u8)(gPlayerState.heldObject - 3) < 2) {
         sub_08078D60();
     }
+#ifdef PC_PORT
+    {
+        /* Coop: called once per frame from the game loop, i.e. for player 1
+         * only; move what player 2 carries too (port_coop.c). */
+        extern int Port_Coop_PushOtherPlayer(void);
+        extern void Port_Coop_PopPlayer(int prev);
+        const int prev = Port_Coop_PushOtherPlayer();
+        if (prev >= 0) {
+            if ((u8)(gPlayerState.heldObject - 3) < 2) {
+                sub_08078D60();
+            }
+            Port_Coop_PopPlayer(prev);
+        }
+    }
+#endif
 }
 
 void sub_08078CD0(PlayerEntity* this) {
