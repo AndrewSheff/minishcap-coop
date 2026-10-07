@@ -231,6 +231,7 @@ static void LeaveP2(void) {
 static int P2Linked(void);
 static int ChooseFocus(const Entity* e, unsigned char* focus);
 static int FocusManaged(const Entity* e);
+static const Entity* FocusRoot(const Entity* e);
 
 int Port_Coop_BeginEntityUpdate(void* entity) {
     if (!sP2Active || sCurrent != 0)
@@ -253,8 +254,9 @@ int Port_Coop_BeginEntityUpdate(void* entity) {
             g < &gEntities[MAX_ENTITIES] && FocusManaged(&g->base)) {
             /* An enemy: while it updates, "the player" is the Link it is
              * busy with — the one it chases, hits, grabs or swallows. */
+            const GenericEntity* root = (const GenericEntity*)FocusRoot(&g->base);
             sFocusContext = 1;
-            if (ChooseFocus(&g->base, &sFocus[g - gEntities]) == 1)
+            if (ChooseFocus(&root->base, &sFocus[root - gEntities]) == 1)
                 Port_Coop_PushPlayer(1);
             return PORT_COOP_FOCUS;
         }
@@ -479,16 +481,44 @@ static int ChooseFocus(const Entity* e, unsigned char* focus) {
     return cur;
 }
 
-/* Non-boss enemies and enemy projectiles follow their focus player. Boss
- * fights stay player 1's for now. */
-static int FocusManaged(const Entity* e) {
-    if (e->kind == ENEMY)
-        return !(((const Enemy*)e)->enemyFlags & EM_FLAG_BOSS);
-    if (e->kind == PROJECTILE) {
-        const Entity* parent = e->parent;
-        return !(parent != NULL && parent->kind == ENEMY && (((const Enemy*)parent)->enemyFlags & EM_FLAG_BOSS));
+/* Bosses whose fight moves the player itself (standing on Gleerok's
+ * body, riding Gyorg) keep those mechanics on player 1; their aiming still
+ * picks the nearer Link through the target filters (PickEnemyTarget). */
+static int FocusExcluded(const Entity* e) {
+    switch (e->id) {
+        case GLEEROK:
+        case GYORG_FEMALE:
+        case GYORG_MALE:
+        case GYORG_CHILD:
+        case GYORG_FEMALE_EYE:
+        case GYORG_MALE_EYE:
+        case GYORG_FEMALE_MOUTH:
+            return 1;
+        default:
+            return 0;
     }
-    return 0;
+}
+
+/* The entity whose focus an enemy part shares: a boss's hands, head,
+ * segments and shots follow the same Link as its body (parent chain). */
+static const Entity* FocusRoot(const Entity* e) {
+    int depth;
+    for (depth = 0; depth < 8 && e->parent != NULL && e->parent != e; depth++) {
+        const GenericEntity* g = (const GenericEntity*)e->parent;
+        if (g < &gEntities[0] || g >= &gEntities[MAX_ENTITIES] || (e->parent->kind != ENEMY))
+            break;
+        e = e->parent;
+    }
+    return e;
+}
+
+/* Enemies (bosses included) and enemy projectiles follow their focus player. */
+static int FocusManaged(const Entity* e) {
+    const Entity* root;
+    if (e->kind != ENEMY && e->kind != PROJECTILE)
+        return 0;
+    root = FocusRoot(e);
+    return root->kind == ENEMY ? !FocusExcluded(root) : e->kind == PROJECTILE;
 }
 
 /* ---- camera (stage 3) ------------------------------------------------- */
