@@ -82,6 +82,7 @@ int Port_Coop_PushPlayer(int idx);
 void Port_Coop_PopPlayer(int prev);
 int Port_Coop_PushOtherPlayer(void);
 int Port_Coop_TextBoxShared(void);
+int Port_Coop_MenuOwnedByP2(void);
 void Port_Coop_CarryOtherPlayer(int dx, int dy);
 int Port_Coop_BeginCollision(const void* a, const void* b);
 void Port_Coop_EndCollision(int token);

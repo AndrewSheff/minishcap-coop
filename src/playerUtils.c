@@ -1291,6 +1291,13 @@ bool32 sub_080782C0(void) {
         if (gSave.kinstones.amounts[0] != 0) {
             gPossibleInteraction.kinstoneId = gPossibleInteraction.currentObject->kinstoneId;
             gPossibleInteraction.currentObject->entity->interactType = INTERACTION_FUSE;
+#ifdef PC_PORT
+            {
+                /* Coop: a fusion player 2 starts gets its menu (port_coop.c). */
+                extern void Port_Coop_OnFuse(void);
+                Port_Coop_OnFuse();
+            }
+#endif
             gPlayerState.queued_action = PLAYER_08070E9C;
         } else {
             CreateEzloHint(TEXT_INDEX(TEXT_EZLO, 0x65), 0); // "Hey, you don't have any Kinstone Pieces! ..."

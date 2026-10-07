@@ -164,7 +164,7 @@ static void Port_UpdateInput(void) {
         }
         Port_Coop_SetP2Keys(p2);
         /* Player 2 opened the pause menu: player 2's buttons drive it. */
-        if (Port_CoopItems_MenuIsP2())
+        if (Port_CoopItems_MenuIsP2() || Port_Coop_MenuOwnedByP2())
             keyinput = (u16)(0x03FF & ~p2);
         /* A text box is open: player 2's buttons advance / answer it too. */
         else if (Port_Coop_TextBoxShared())

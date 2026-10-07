@@ -163,6 +163,13 @@ void ResetUI(void) {
 }
 
 void MenuFadeIn(u32 param_1, u32 param_2) {
+#ifdef PC_PORT
+    {
+        /* Coop: the kinstone menu of a fusion player 2 started (port_coop.c). */
+        extern void Port_Coop_OnMenuFadeIn(unsigned int menu);
+        Port_Coop_OnMenuFadeIn(param_1);
+    }
+#endif
     if (gUI.nextToLoad == 0) {
         MemClear(&gUI, sizeof(gUI));
         gUI.lastState = param_1;

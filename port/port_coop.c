@@ -487,6 +487,40 @@ int Port_Coop_PushOtherPlayer(void) {
     return Port_Coop_PushPlayer(1 - sCurrent);
 }
 
+/* Kinstone fusion started by player 2 (its L at a fusable NPC): the NPC
+ * runs the fusion with player 1 as "the player", but the kinstone menu it
+ * opens (subtask 4, src/common.c Fuse_Action1) is driven by player 2's
+ * buttons until it closes. */
+static int sFuseByP2;
+static int sMenuP2;     /* 1 = opening, 2 = running */
+static int sMenuP2Wait;
+
+void Port_Coop_OnFuse(void) {
+    sFuseByP2 = sCurrent == 1 && !sFocusContext;
+}
+
+void Port_Coop_OnMenuFadeIn(unsigned int menu) {
+    if (menu == 4 && sFuseByP2) {
+        sMenuP2 = 1;
+        sMenuP2Wait = 60;
+    }
+    sFuseByP2 = 0;
+}
+
+int Port_Coop_MenuOwnedByP2(void) {
+    return sMenuP2 != 0;
+}
+
+static void MenuP2Tick(void) {
+    const int inGame = gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN && gMain.substate == GAMEMAIN_UPDATE;
+    if (sMenuP2 == 1) {
+        if (!inGame || --sMenuP2Wait <= 0)
+            sMenuP2 = 2;
+    } else if (sMenuP2 == 2 && (inGame || gMain.task != TASK_GAME)) {
+        sMenuP2 = 0;
+    }
+}
+
 /* playerUtils.c: a player started an interaction (talk, open, use key).
  * Objects (chests, big-key doors...) then update as that player's, so an
  * item-get scene plays on the Link who opened them. NPCs keep running with
@@ -501,13 +535,13 @@ void Port_Coop_OnInteract(Entity* entity) {
 
 /* Interaction candidates live in one world list (player 1's storage,
  * playerUtils.c WORLD_INTERACTIONS); player 2 reads its own copy, refreshed
- * every frame. Kinstone fusion and shop items stay player 1's. */
+ * every frame. Shop items stay player 1's (the shopkeeper's script checks
+ * "the player" for the carried item). */
 static void MirrorInteractions(void) {
     PossibleInteraction* p2 = &gPortPossibleInteractions[1];
     int i;
     memcpy(p2->candidates, gPortPossibleInteractions[0].candidates, sizeof(p2->candidates));
     for (i = 0; i < (int)(sizeof(p2->candidates) / sizeof(p2->candidates[0])); i++) {
-        p2->candidates[i].kinstoneId = 0;
         if (p2->candidates[i].type == INTERACTION_LIFT_SHOP_ITEM)
             p2->candidates[i].type = INTERACTION_NONE;
     }
@@ -903,6 +937,7 @@ static int GameplayLive(void) {
 
 void Port_Coop_FrameTick(void) {
     Port_CoopItems_FrameTick(); /* player 2's pause menu opening / closing */
+    MenuP2Tick();               /* the kinstone menu of a fusion player 2 started */
     /* Player 2's gInput for this frame. */
     sP2Input.heldKeys = sP2Held;
     sP2Input.newKeys = (u16)(sP2Held & ~sP2PrevHeld);
