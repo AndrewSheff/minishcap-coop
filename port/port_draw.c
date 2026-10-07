@@ -144,6 +144,7 @@ extern UpdateContext gUpdateContext;
  * permissive enemy's target leaks into a stricter one (e.g. an enemy that should
  * only target a minish Link). */
 extern Entity* gEnemyTarget;
+#include "port_coop.h"
 
 /* External function called after each entity update */
 extern void UpdateCollision(Entity* entity);
@@ -255,6 +256,10 @@ void ram_UpdateEntities(u32 mode) {
 
             sEntitiesUpdated++;
 
+            /* Coop: player 2 and everything it spawned update with player 2
+             * as the "current player" (port/port_coop.c), collision included. */
+            const int coopToken = Port_Coop_BeginEntityUpdate(entity);
+
             if (kind < 10) {
 
                 sEntityUpdateJmpBufValid = 1;
@@ -284,6 +289,7 @@ void ram_UpdateEntities(u32 mode) {
             if (cur == entity) {
                 UpdateCollision(entity);
             }
+            Port_Coop_EndEntityUpdate(coopToken);
 
             /* Advance: current_entity->next, read late (ldr r4,[r0,#4]).
              * UnlinkEntity never nulls current_entity mid-list, so NULL here

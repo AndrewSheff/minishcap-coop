@@ -4,7 +4,7 @@
     {
       "name": "enemies",
       "description": "Храм Deepwood, комната с колоннами: шесть слизней-Слаггул. Бой, удары, отбрасывание.",
-      "warp": "0x48,0x09,0x88,0xc0,1",
+      "warp": "0x48,0x09,0x88,0xa8,1",
       "all_items": true,
       "mid_game_flags": true
     },
@@ -39,7 +39,7 @@
     {
       "name": "npc",
       "description": "Дом Линка, мастерская: кузнец Смит в комнате. Подойти и поговорить (A — клавиша X).",
-      "warp": "0x22,0x11,0x78,0x88,1",
+      "warp": "0x22,0x11,0x78,0x78,1",
       "all_items": true,
       "mid_game_flags": true
     }

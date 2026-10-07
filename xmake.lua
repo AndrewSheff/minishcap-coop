@@ -721,6 +721,7 @@ target("tmc_pc")
     add_files("port/port_debug_actions.c")
     add_files("port/port_flag_names.cpp")
     add_files("port/port_debug_entities.c")
+    add_files("port/port_coop.c")               -- local coop: player 2 (stage 1)
     add_files("port/port_coop_test.c")          -- coop-test quick start (TMC_COOP_TEST, F8 Coop Test tab)
     add_files("port/port_coop_test_presets.cpp")  -- coop_tests.json loader
     add_files("port/port_debug_memory_watch.c")  -- live GBA memory-watch list (F8 Memory tab)

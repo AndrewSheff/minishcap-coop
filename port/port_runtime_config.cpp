@@ -58,6 +58,21 @@ const std::array<Def, PORT_INPUT_COUNT> kDefaults = { {
     { PORT_INPUT_ROLL_ATTACK, "roll_attack", { "SDLK:0x00000064", "SDL_GAMEPAD:0x00000008" } },
 } };
 
+/* Coop player 2 keyboard defaults (GBA buttons only; START/SELECT stay with
+ * player 1, who owns menus and dialogue). I/J/K/L move, U = B (sword),
+ * O = A, H = R, Y = L. P is avoided: it is the practice-mode pause key. A
+ * second gamepad (see p2_gamepad) uses player 1's pad bindings. */
+const std::array<Def, 8> kP2Defaults = { {
+    { PORT_INPUT_A, "a", { "SDLK:0x0000006f" } },
+    { PORT_INPUT_B, "b", { "SDLK:0x00000075" } },
+    { PORT_INPUT_RIGHT, "right", { "SDLK:0x0000006c" } },
+    { PORT_INPUT_LEFT, "left", { "SDLK:0x0000006a" } },
+    { PORT_INPUT_UP, "up", { "SDLK:0x00000069" } },
+    { PORT_INPUT_DOWN, "down", { "SDLK:0x0000006b" } },
+    { PORT_INPUT_R, "r", { "SDLK:0x00000068" } },
+    { PORT_INPUT_L, "l", { "SDLK:0x00000079" } },
+} };
+
 u8 sScale = 3;
 u8 sInternalScale = 1;
 std::string sUpscaleMethod = "nearest";
@@ -213,6 +228,13 @@ bool sCaptureAppend = false;
  * between two polls) that the polled-state path would otherwise miss
  * — useful for frame-perfect rolls / spin-attack inputs. */
 std::array<bool, PORT_INPUT_COUNT> sEdgePressed{};
+/* Coop player 2: keyboard binds (from p2_bindings) and its own edge cache. */
+std::array<std::vector<Bind>, PORT_INPUT_COUNT> sBindsP2;
+std::array<bool, PORT_INPUT_COUNT> sEdgePressedP2{};
+/* p2_gamepad: "auto" = the second connected pad belongs to player 2,
+ * "first" = the first (or only) pad does, "none" = player 2 is keyboard-only. */
+std::string sP2Gamepad = "auto";
+bool sCoopP2Join = true;
 std::vector<SDL_Gamepad*> sPads;
 std::filesystem::path sConfigPath = "config.json";
 nlohmann::json sConfigJson;
@@ -261,6 +283,7 @@ struct ScaleCfg {
 
 const BoolCfg kBoolCfg[] = {
     { "port_settings_menu", &sPortSettingsMenuEnabled, true },
+    { "coop_p2_join", &sCoopP2Join, true },
     { "autosave_enabled", &sAutosaveEnabled, true },
 #ifdef __ANDROID__
     { "widescreen_enabled", &sWidescreenEnabled, false },
@@ -320,6 +343,7 @@ const IntCfg kIntCfg[] = {
 };
 const StrCfg kStrCfg[] = {
     { "upscale_method", &sUpscaleMethod, "nearest" },
+    { "p2_gamepad", &sP2Gamepad, "auto" },
     { "active_save_profile", &sActiveSaveProfile, "tmc.sav" },
     { "tts_voice", &sTtsVoice, "" },
     { "tts_language", &sTtsLanguage, "" },
@@ -368,6 +392,13 @@ nlohmann::json DefaultsJson(void) {
         j["bindings"][d.name] = nlohmann::json::array();
         for (const char* bind : d.binds) {
             j["bindings"][d.name].push_back(bind);
+        }
+    }
+    j["p2_bindings"] = nlohmann::json::object();
+    for (const auto& d : kP2Defaults) {
+        j["p2_bindings"][d.name] = nlohmann::json::array();
+        for (const char* bind : d.binds) {
+            j["p2_bindings"][d.name].push_back(bind);
         }
     }
     return j;
@@ -787,6 +818,20 @@ extern "C" void Port_Config_Load(const char* path) {
         const auto& b = j.contains("bindings") ? j["bindings"] : empty;
         for (const auto& d : kDefaults) {
             LoadBinds(d.input, b.contains(d.name) ? b[d.name] : DefaultsJson()["bindings"][d.name]);
+        }
+        for (auto& v : sBindsP2) {
+            v.clear();
+        }
+        const auto& b2 = j.contains("p2_bindings") && j["p2_bindings"].is_object() ? j["p2_bindings"] : empty;
+        for (const auto& d : kP2Defaults) {
+            const nlohmann::json& v = b2.contains(d.name) ? b2[d.name] : DefaultsJson()["p2_bindings"][d.name];
+            for (const auto& it : (v.is_array() ? v : nlohmann::json::array({ v }))) {
+                if (it.is_string() && it.get<std::string>().rfind("SDLK:", 0) == 0) {
+                    Bind kb;
+                    kb.key = static_cast<SDL_Keycode>(std::strtoul(it.get<std::string>().c_str() + 5, nullptr, 0));
+                    sBindsP2[d.input].push_back(kb);
+                }
+            }
         }
     };
 
@@ -1311,6 +1356,21 @@ static void PersistBinds(PortInput input) {
     SaveConfig();
 }
 
+/* The gamepad that belongs to coop player 2 (nullptr = none); see
+ * sP2Gamepad. Player 1 reads every other pad. */
+static SDL_Gamepad* P2Pad(void) {
+    if (sP2Gamepad == "first")
+        return sPads.empty() ? nullptr : sPads[0];
+    if (sP2Gamepad == "none")
+        return nullptr;
+    return sPads.size() >= 2 ? sPads[1] : nullptr;
+}
+
+static bool IsP2PadId(SDL_JoystickID id) {
+    SDL_Gamepad* pad = P2Pad();
+    return pad != nullptr && SDL_GetGamepadID(pad) == id;
+}
+
 extern "C" void Port_Config_HandleEvent(const SDL_Event* e) {
     /* Touch-controls dispatch first so finger / virtual-pad events on
      * Android route to the touch handler before the keyboard / pad
@@ -1395,23 +1455,31 @@ extern "C" void Port_Config_HandleEvent(const SDL_Event* e) {
                     break;
                 }
             }
+            for (const Bind& b : sBindsP2[i]) {
+                if (b.key != SDLK_UNKNOWN && b.key == e->key.key) {
+                    sEdgePressedP2[i] = true;
+                    break;
+                }
+            }
         }
     } else if (e->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
         Port_TouchControls_NotifyGamepadUsed();
+        auto& edges = IsP2PadId(e->gbutton.which) ? sEdgePressedP2 : sEdgePressed;
         for (size_t i = 0; i < PORT_INPUT_COUNT; i++) {
             for (const Bind& b : sBinds[i]) {
                 if (b.pad >= 0 && b.pad < SDL_GAMEPAD_BUTTON_COUNT && b.pad == (SDL_GamepadButton)e->gbutton.button) {
-                    sEdgePressed[i] = true;
+                    edges[i] = true;
                     break;
                 }
             }
         }
     } else if (e->type == SDL_EVENT_GAMEPAD_AXIS_MOTION && e->gaxis.value > kAxisThreshold) {
         Port_TouchControls_NotifyGamepadUsed();
+        auto& edges = IsP2PadId(e->gaxis.which) ? sEdgePressedP2 : sEdgePressed;
         for (size_t i = 0; i < PORT_INPUT_COUNT; i++) {
             for (const Bind& b : sBinds[i]) {
                 if (b.axis >= 0 && b.axis < SDL_GAMEPAD_AXIS_COUNT && b.axis == (SDL_GamepadAxis)e->gaxis.axis) {
-                    sEdgePressed[i] = true;
+                    edges[i] = true;
                     break;
                 }
             }
@@ -1421,6 +1489,47 @@ extern "C" void Port_Config_HandleEvent(const SDL_Event* e) {
 
 extern "C" void Port_Config_ClearInputEdges(void) {
     sEdgePressed.fill(false);
+    sEdgePressedP2.fill(false);
+}
+
+extern "C" void Port_Config_TestForceEdgeP2(PortInput input) {
+    if (input >= 0 && input < PORT_INPUT_COUNT) {
+        sEdgePressedP2[input] = true;
+    }
+}
+
+extern "C" bool Port_Config_CoopP2JoinEnabled(void) {
+    return sCoopP2Join;
+}
+
+/* Coop player 2's buttons: its keyboard binds (p2_bindings), its edge cache,
+ * and its gamepad (P2Pad) read through player 1's pad bindings. */
+extern "C" bool Port_Config_InputPressedP2(PortInput input) {
+    if (input < 0 || input >= PORT_INPUT_COUNT) {
+        return false;
+    }
+    if (!sConsoleParity && sEdgePressedP2[input]) {
+        return true;
+    }
+    int count = 0;
+    const bool* keys = SDL_GetKeyboardState(&count);
+    for (const Bind& b : sBindsP2[input]) {
+        SDL_Scancode scan = b.key == SDLK_UNKNOWN ? SDL_SCANCODE_UNKNOWN : SDL_GetScancodeFromKey(b.key, nullptr);
+        if (scan != SDL_SCANCODE_UNKNOWN && (int)scan < count && keys[scan]) {
+            return true;
+        }
+    }
+    if (SDL_Gamepad* pad = P2Pad()) {
+        for (const Bind& b : sBinds[input]) {
+            if (b.pad >= 0 && b.pad < SDL_GAMEPAD_BUTTON_COUNT && SDL_GetGamepadButton(pad, b.pad)) {
+                return true;
+            }
+            if (b.axis >= 0 && b.axis < SDL_GAMEPAD_AXIS_COUNT && SDL_GetGamepadAxis(pad, b.axis) > kAxisThreshold) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /* Test-only input seam. Stamps the per-frame edge cache for `input` exactly
@@ -1522,6 +1631,9 @@ extern "C" bool Port_Config_InputPressed(PortInput input) {
             return true;
         }
         for (SDL_Gamepad* pad : sPads) {
+            if (pad == P2Pad()) {
+                continue; /* coop player 2's pad */
+            }
             if (b.pad >= 0 && b.pad < SDL_GAMEPAD_BUTTON_COUNT && SDL_GetGamepadButton(pad, b.pad)) {
                 Port_TouchControls_NotifyGamepadUsed();
                 return true;
@@ -1553,10 +1665,16 @@ extern "C" bool Port_Config_SoftSlotPressed(int slot) {
  * false (and leaves outputs untouched) when no gamepad is attached or
  * when SDL hasn't reported any stick activity yet. */
 extern "C" bool Port_Config_GetLeftStick(float* outX, float* outY) {
-    if (sPads.empty()) {
+    SDL_Gamepad* pad = nullptr;
+    for (SDL_Gamepad* p : sPads) {
+        if (p != P2Pad()) { /* skip coop player 2's pad */
+            pad = p;
+            break;
+        }
+    }
+    if (pad == nullptr) {
         return false;
     }
-    SDL_Gamepad* pad = sPads.front();
     /* SDL axis values are int16 -32768..32767. Normalise to [-1, 1].
      * +y on SDL = stick down = positive screen-y in TMC (top-left
      * origin), so no sign flip is required despite intuition. */

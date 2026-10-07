@@ -77,8 +77,14 @@ int Port_IsValidEntityAddr(const void* p) {
     if (p == NULL)
         return 0;
     const uintptr_t a = (uintptr_t)p;
-    if (a == (uintptr_t)(void*)&gPlayerEntity)
-        return 1;
+    /* Every player slot, not just the current one (gPlayerEntity is the
+     * coop "current player", include/port_player_ctx.h). */
+    {
+        extern PlayerEntity gPortPlayerEntities[PORT_MAX_PLAYERS];
+        for (int i = 0; i < PORT_MAX_PLAYERS; i++)
+            if (a == (uintptr_t)(void*)&gPortPlayerEntities[i])
+                return 1;
+    }
     if (a >= (uintptr_t)(void*)&gAuxPlayerEntities[0] &&
         a <= (uintptr_t)(void*)&gAuxPlayerEntities[MAX_AUX_PLAYER_ENTITIES - 1])
         return 1;
@@ -885,6 +891,12 @@ void AppendEntityToList(Entity* entity, u32 listIndex) {
     }
     InitDefaultPriority(entity);
 #ifdef PC_PORT
+    {
+        /* Coop: entities spawned during player 2's update belong to player 2
+         * (port/port_coop.c), so they update with player 2 as "the player". */
+        extern void Port_Coop_OnEntityAppended(void* entity);
+        Port_Coop_OnEntityAppended(entity);
+    }
     /* #93 chase: log every kind=6 (OBJECT) list-assignment so we can
      * see which list orchestrators (id=0x69) land in, and catch the
      * moment one gets re-listed mid-cutscene. */

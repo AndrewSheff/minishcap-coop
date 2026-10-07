@@ -41,6 +41,12 @@ bool Port_AnalogMovement_Apply(u32* heldInputOut, u32* directionOut) {
     if (!Port_Reborn_IsEnabled(REBORN_FEAT_ANALOG_360_MOVEMENT)) {
         return false;
     }
+    /* The stick is player 1's; coop player 2 moves with its d-pad / keys. */
+    {
+        extern int Port_Coop_CurrentPlayer(void);
+        if (Port_Coop_CurrentPlayer() != 0)
+            return false;
+    }
 
     float sx = 0.0f, sy = 0.0f;
     if (!Port_Config_GetLeftStick(&sx, &sy)) {

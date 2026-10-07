@@ -13,14 +13,21 @@
 
 #ifdef PC_PORT
 
-#define PC_MAX_ENTITY_SLOTS 80 /* 1 player + 7 aux + 72 regular */
+#define PC_MAX_ENTITY_SLOTS 81 /* 1 player + 7 aux + 72 regular + coop player 2 (slot 80) */
+#define PC_ENTITY_SLOT_PLAYER2 80
+
+extern PlayerEntity gPortPlayerEntities[PORT_MAX_PLAYERS];
 
 extern ScriptExecutionContext* gEntityScriptCtxTable[PC_MAX_ENTITY_SLOTS];
 
 /* Map entity pointer → slot index. Returns -1 if not found. */
 static inline int Port_EntitySlot(const Entity* ent) {
-    if (ent == &gPlayerEntity.base)
+    /* Fixed slots per player storage — gPlayerEntity is the coop "current
+     * player" and would make slot 0 mean different entities over a frame. */
+    if (ent == &gPortPlayerEntities[0].base)
         return 0;
+    if (ent == &gPortPlayerEntities[1].base)
+        return PC_ENTITY_SLOT_PLAYER2;
     {
         int i;
         for (i = 0; i < MAX_AUX_PLAYER_ENTITIES; i++)
@@ -43,7 +50,9 @@ static inline Entity* Port_EntityFromSlot(int slot) {
     if (slot < 0)
         return NULL;
     if (slot == 0)
-        return &gPlayerEntity.base;
+        return &gPortPlayerEntities[0].base;
+    if (slot == PC_ENTITY_SLOT_PLAYER2)
+        return &gPortPlayerEntities[1].base;
     if (slot < 1 + MAX_AUX_PLAYER_ENTITIES)
         return &gAuxPlayerEntities[slot - 1].base;
     if (slot < 1 + MAX_AUX_PLAYER_ENTITIES + MAX_ENTITIES)
@@ -63,9 +72,9 @@ static inline void Port_SetEntityScriptCtx(Entity* ent, ScriptExecutionContext* 
         /* Also write to the GenericEntity's scriptContext struct field so that
          * entity-specific structs (BedCover, EzloCap, Stockwell, etc.) which read
          * their own unk_84/context field directly still see the correct value.
-         * SKIP for gPlayerEntity (slot 0): PlayerEntity is smaller than GenericEntity
-         * and the 8-byte write would overflow past the end of the struct. */
-        if (slot > 0) {
+         * SKIP for the players (slot 0, PC_ENTITY_SLOT_PLAYER2): PlayerEntity is smaller
+         * than GenericEntity and the 8-byte write would overflow past the end of the struct. */
+        if (slot > 0 && slot != PC_ENTITY_SLOT_PLAYER2) {
             ((GenericEntity*)ent)->scriptContext = ctx;
         }
     }

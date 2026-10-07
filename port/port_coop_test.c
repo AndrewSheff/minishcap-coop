@@ -30,6 +30,7 @@
 #include "rando/rando.h"
 #include "port_coop_test.h"
 #include "port_debug_actions.h"
+#include "port_coop.h"
 #include "port_runtime_config.h"
 
 extern void SetActiveSave(u32 idx);
@@ -163,6 +164,7 @@ static void BootIntoPreset(int i, unsigned int frame) {
     if (Rando_IsActive())
         Rando_Reset();
     ApplySaveState(p);
+    Port_Coop_RequestJoin(); /* coop test: player 2 is there from the start */
     SetTask(TASK_GAME);
     sSkipResumeHint = 1;
     sWarpPending = i; /* fallback if the save start lands elsewhere */
@@ -179,6 +181,7 @@ int Port_CoopTest_Go(int i) {
         if (!InGameplay())
             return 0;
         ApplySaveState(p);
+        Port_Coop_RequestJoin();
         sWarpPending = i;
         sWarpFiredAt = 0;
         sForceWarp = 1;

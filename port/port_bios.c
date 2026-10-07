@@ -30,6 +30,7 @@
 #include <setjmp.h>
 #include "port_repro.h"
 #include "port_coop_test.h"
+#include "port_coop.h"
 
 static bool gQuitRequested = false;
 static bool sFastForward = false;
@@ -134,6 +135,7 @@ static void Port_UpdateInput(void) {
         if (Port_DebugMenu_IsOpen() || Port_SoftSlots_ConfigIsOpen() || Port_InGameSettingsModalIsOpen() ||
             Port_RandoFileMenu_IsOpen() || Port_LevelEditor_IsOpen()) {
             *(vu16*)(gIoMem + REG_OFFSET_KEYINPUT) = keyinput;
+            Port_Coop_SetP2Keys(0);
             /* The one-frame edge cache must be cleared on this path too: the
              * event loop keeps stamping edges for keys/pad buttons the overlays
              * ignore, and a stale flag would fire the frame the overlay closes. */
@@ -148,6 +150,20 @@ static void Port_UpdateInput(void) {
         if (Port_Config_InputPressed(sInputMap[i].input)) {
             keyinput &= ~sInputMap[i].gbaMask;
         }
+    }
+
+    /* Coop player 2: its buttons as a GBA held-keys mask (active-high), read
+     * by port_coop.c. START / SELECT are player 1's (menus, dialogue). */
+    {
+        u16 p2 = 0;
+        for (size_t i = 0; i < sizeof(sInputMap) / sizeof(sInputMap[0]); i++) {
+            if (sInputMap[i].gbaMask != START_BUTTON && sInputMap[i].gbaMask != SELECT_BUTTON &&
+                Port_Config_InputPressedP2(sInputMap[i].input)) {
+                p2 |= sInputMap[i].gbaMask;
+            }
+        }
+        Port_Coop_SetP2Keys(p2);
+        Port_Coop_FrameTick();
     }
 
     /* Soft-slots (X / Y / L2 / R2): when one is held with an item
@@ -591,6 +607,7 @@ static void Port_TestInputTick(u32 tick) {
         u32 tick;
         u32 until; /* exclusive */
         PortInput input;
+        u8 p2; /* "tick:p2:button" — coop player 2 */
     } seq[256];
     static int n = 0;
     int i;
@@ -621,9 +638,15 @@ static void Port_TestInputTick(u32 tick) {
                 colon = strchr(tok, ':');
                 if (colon) {
                     char* dur;
+                    char* name = colon + 1;
                     u32 hold = 1;
+                    u8 p2 = 0;
                     *colon = '\0';
-                    dur = strchr(colon + 1, ':');
+                    if (strncmp(name, "p2:", 3) == 0) {
+                        p2 = 1;
+                        name += 3;
+                    }
+                    dur = strchr(name, ':');
                     if (dur) {
                         *dur = '\0';
                         hold = (u32)strtoul(dur + 1, NULL, 0);
@@ -631,10 +654,11 @@ static void Port_TestInputTick(u32 tick) {
                             hold = 1;
                     }
                     for (k = 0; k < sizeof(kMap) / sizeof(kMap[0]); k++) {
-                        if (strcmp(colon + 1, kMap[k].name) == 0) {
+                        if (strcmp(name, kMap[k].name) == 0) {
                             seq[n].tick = (u32)strtoul(tok, NULL, 0);
                             seq[n].until = seq[n].tick + hold;
                             seq[n].input = kMap[k].input;
+                            seq[n].p2 = p2;
                             n++;
                             break;
                         }
@@ -646,7 +670,10 @@ static void Port_TestInputTick(u32 tick) {
     }
     for (i = 0; i < n; i++) {
         if (tick >= seq[i].tick && tick < seq[i].until) {
-            Port_Config_TestForceEdge(seq[i].input);
+            if (seq[i].p2)
+                Port_Config_TestForceEdgeP2(seq[i].input);
+            else
+                Port_Config_TestForceEdge(seq[i].input);
         }
     }
 }
