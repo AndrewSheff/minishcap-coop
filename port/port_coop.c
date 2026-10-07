@@ -316,6 +316,20 @@ void Port_Coop_EndEntityUpdate(int token) {
         LeaveP2();
 }
 
+/* GameMain_Update calls CheckInitPauseMenu() once a frame from the game
+ * loop, i.e. for player 1 with player 1's input. Player 2's Start gets the
+ * same check here, in player 2's context (its gInput, state and A/B). */
+int Port_Coop_CheckPauseMenuP2(void) {
+    extern bool32 CheckInitPauseMenu(void);
+    int opened;
+    if (!sP2Active || sHidden || sCurrent != 0 || !P2Linked() || !(sP2Input.newKeys & START_BUTTON))
+        return 0;
+    EnterP2();
+    opened = CheckInitPauseMenu(); /* opens in player 2 mode (port_coop_items.c) */
+    LeaveP2();
+    return opened;
+}
+
 /* ---- the world sees player 2 (stage 2) ---------------------------------- */
 
 static int P2Linked(void);

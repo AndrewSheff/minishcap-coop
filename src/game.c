@@ -305,6 +305,15 @@ static void GameMain_Update(void) {
     if (CheckInitPauseMenu() || CheckInitPortal()) {
         return;
     }
+#ifdef PC_PORT
+    {
+        /* Coop: the pause-menu check above runs for player 1 only (player 1's
+         * input); player 2's Start gets the same check as player 2. */
+        extern int Port_Coop_CheckPauseMenuP2(void);
+        if (Port_Coop_CheckPauseMenuP2())
+            return;
+    }
+#endif
     UpdateTimerCallbacks();
 
     // leave early if player is now entering a portal
