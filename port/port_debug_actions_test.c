@@ -39,8 +39,11 @@ const u8 gQuiverSizes[]  = { 30, 50, 70, 99 };  /* mirrors src/itemUtils.c */
 
 /* ---- state/stubs for warp readiness and otherwise unused engine helpers ---- */
 Main gMain;
-PlayerState gPlayerState;
-PlayerEntity gPlayerEntity;
+/* gPlayerState / gPlayerEntity are "current player" macros (port_player_ctx.h). */
+static PlayerState sTestPlayerState;
+static PlayerEntity sTestPlayerEntity;
+PlayerState* gPortCurPlayerState = &sTestPlayerState;
+PlayerEntity* gPortCurPlayerEntity = &sTestPlayerEntity;
 RoomControls gRoomControls;
 RoomTransition gRoomTransition;
 RoomHeader* gAreaRoomHeaders[0x90];

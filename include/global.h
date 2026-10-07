@@ -26,6 +26,7 @@
 ///@}
 
 #include "gba/gba.h"
+#include "port_player_ctx.h"
 #include <stddef.h>
 #include <string.h>
 

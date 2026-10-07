@@ -111,10 +111,20 @@ SaveFile gSave;
 VBlankDMA gVBlankDMA;
 u8 gUpdateVisibleTiles;
 
-// Player
-PlayerEntity gPlayerEntity;
-PlayerState gPlayerState;
-Entity* gPlayerClones[3];
+// Player. One set per player; the gPlayerEntity / gPlayerState / ... names are
+// macros for "the current player" (include/port_player_ctx.h, port/port_coop.c).
+PlayerEntity gPortPlayerEntities[PORT_MAX_PLAYERS];
+PlayerState gPortPlayerStates[PORT_MAX_PLAYERS];
+Entity* gPortPlayerClones[PORT_MAX_PLAYERS][3];
+ItemBehavior gPortActiveItems[PORT_MAX_PLAYERS][MAX_ACTIVE_ITEMS];
+PossibleInteraction gPortPossibleInteractions[PORT_MAX_PLAYERS];
+CarriedEntity gPortCarriedEntities[PORT_MAX_PLAYERS];
+PlayerEntity* gPortCurPlayerEntity = &gPortPlayerEntities[0];
+PlayerState* gPortCurPlayerState = &gPortPlayerStates[0];
+Entity* (*gPortCurPlayerClones)[3] = &gPortPlayerClones[0];
+ItemBehavior (*gPortCurActiveItems)[MAX_ACTIVE_ITEMS] = &gPortActiveItems[0];
+PossibleInteraction* gPortCurPossibleInteraction = &gPortPossibleInteractions[0];
+CarriedEntity* gPortCurCarriedEntity = &gPortCarriedEntities[0];
 ScriptExecutionContext gPlayerScriptExecutionContext;
 
 // Entities
@@ -128,10 +138,7 @@ u8 gManagerCount;
 // Side table for 64-bit ScriptExecutionContext pointers
 // (avoids overflowing PlayerEntity's 4-byte unk_84 field with 8-byte pointers)
 ScriptExecutionContext* gEntityScriptCtxTable[PC_MAX_ENTITY_SLOTS] = { 0 };
-CarriedEntity gCarriedEntity;
-ItemBehavior gActiveItems[MAX_ACTIVE_ITEMS];
 PriorityHandler gPriorityHandler;
-PossibleInteraction gPossibleInteraction;
 
 // Room / Map
 RoomControls gRoomControls;

@@ -127,6 +127,8 @@ SHADOW_PREFIX_GATE(PlayerState, field_0x27, 0x2C, item);
 /* The table. Sorted by address; sortedness and non-overlap are checked by    */
 /* the self-test.                                                            */
 /* ------------------------------------------------------------------------- */
+extern PlayerState gPortPlayerStates[PORT_MAX_PLAYERS]; /* gPlayerState is a "current player" macro */
+
 static const ShadowRow sEwramRows[] = {
     { 0x00050u, &gMessage, sizeof(gMessage) },                   /* current message box state */
     { 0x02A40u, &gSave, sizeof(gSave) },                         /* flags, inventory, figurines, kinstones, stats */
@@ -145,7 +147,7 @@ static const ShadowRow sIwramRows[] = {
     { 0x01000u, &gMain, sizeof(gMain) },                       /* game state + substate */
     { 0x010A0u, &gRoomTransition, sizeof(gRoomTransition) },   /* destination area/room during a transition */
     { 0x03DBCu, &gEntCount, sizeof(gEntCount) },               /* live entity count */
-    { 0x03F80u, &gPlayerState, 0x2Cu },                        /* floor type, swim/dash state, tile position */
+    { 0x03F80u, &gPortPlayerStates[0], 0x2Cu },                /* player 1: floor type, swim/dash state, tile position */
 };
 
 /* ------------------------------------------------------------------------- */

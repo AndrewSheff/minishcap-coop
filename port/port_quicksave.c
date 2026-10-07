@@ -61,7 +61,14 @@ extern u8 gIwram[];
 extern u8 gVram[];
 extern u8 gIoMem[];
 extern LinkedList gEntityListsBackup[9];
-extern Entity* gPlayerClones[3];
+/* Per-player storage behind the "current player" macros (port_player_ctx.h):
+ * snapshot every player, not just whichever is current. */
+extern PlayerEntity gPortPlayerEntities[PORT_MAX_PLAYERS];
+extern PlayerState gPortPlayerStates[PORT_MAX_PLAYERS];
+extern Entity* gPortPlayerClones[PORT_MAX_PLAYERS][3];
+extern ItemBehavior gPortActiveItems[PORT_MAX_PLAYERS][MAX_ACTIVE_ITEMS];
+extern PossibleInteraction gPortPossibleInteractions[PORT_MAX_PLAYERS];
+extern CarriedEntity gPortCarriedEntities[PORT_MAX_PLAYERS];
 extern UpdateContext gUpdateContext;
 
 /* The gameplay PRNG seed. On GBA this lived in IWRAM (0x03001150) and was
@@ -97,8 +104,8 @@ static StateRegion sRegions[] = {
     { gVram, 0x18000, "gVram" },
     { gIoMem, 0x400, "gIoMem" },
     { &gSave, sizeof(gSave), "gSave" },
-    { &gPlayerEntity, sizeof(gPlayerEntity), "gPlayerEntity", 1 },
-    { &gPlayerState, sizeof(gPlayerState), "gPlayerState", 1 },
+    { gPortPlayerEntities, sizeof(gPortPlayerEntities), "gPlayerEntity", 1 },
+    { gPortPlayerStates, sizeof(gPortPlayerStates), "gPlayerState", 1 },
     { &gMain, sizeof(gMain), "gMain" },
     { &gRoomControls, sizeof(gRoomControls), "gRoomControls", 1 },
     { &gRoomTransition, sizeof(gRoomTransition), "gRoomTransition", 1 },
@@ -108,11 +115,12 @@ static StateRegion sRegions[] = {
     { gEntityLists, sizeof(gEntityLists), "gEntityLists", 1 },
     { gEntityListsBackup, sizeof(gEntityListsBackup), "gEntityListsBackup", 1 },
     { gAuxPlayerEntities, sizeof(gAuxPlayerEntities), "gAuxPlayerEntities", 1 },
-    { &gCarriedEntity, sizeof(gCarriedEntity), "gCarriedEntity", 1 },
+    { gPortCarriedEntities, sizeof(gPortCarriedEntities), "gCarriedEntity", 1 },
     { &gEntCount, sizeof(gEntCount), "gEntCount" },
     { &gManagerCount, sizeof(gManagerCount), "gManagerCount" },
-    { gActiveItems, sizeof(gActiveItems), "gActiveItems", 1 },
-    { gPlayerClones, sizeof(gPlayerClones), "gPlayerClones", 1 },
+    { gPortActiveItems, sizeof(gPortActiveItems), "gActiveItems", 1 },
+    { gPortPlayerClones, sizeof(gPortPlayerClones), "gPlayerClones", 1 },
+    { gPortPossibleInteractions, sizeof(gPortPossibleInteractions), "gPossibleInteraction", 1 },
     { &gUpdateContext, sizeof(gUpdateContext), "gUpdateContext", 1 },
 };
 
@@ -122,7 +130,7 @@ static StateRegion sRegions[] = {
 #define NUM_AUTO_SLOTS 3
 #define MAGIC 0x53434D54u /* "TMCS" little-endian */
 #define VERSION                                         \
-    7u /* v2: header carries gEntities base address for \
+    8u /* v2: header carries gEntities base address for \
         * cross-process pointer-fixup on restore.       \
         * v3: gRand added to region list so RNG         \
         * state round-trips (GBA had it in IWRAM).      \
@@ -136,7 +144,8 @@ static StateRegion sRegions[] = {
         * v7: entity bookkeeping and per-region bases   \
         * for relocating both nodes and list sentinels. \
         * v7 is also the first with gSave.flags at the  \
-        * retail 0x25C; v6 may hold the old PC layout. */
+        * retail 0x25C; v6 may hold the old PC layout. \
+        * v8: coop — every player's state is captured. */
 
 typedef struct {
     u8* snapshot; /* heap, NULL if slot empty */
