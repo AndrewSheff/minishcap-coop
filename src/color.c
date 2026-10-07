@@ -105,14 +105,22 @@ u32 LoadObjPalette(Entity* entity, u32 objPaletteId) {
 
     slot = FindPalette(objPaletteId);
     if (slot < 0) {
-        if (objPaletteId < 0x16) {
+#ifdef PC_PORT
+        extern int Port_Coop_IsP2Palette(unsigned int paletteId);
+        extern unsigned int Port_Coop_P2PaletteBase(unsigned int paletteId);
+        /* Coop player 2's tinted copies of the player palettes (port_coop.c). */
+        const u32 basePaletteId = Port_Coop_IsP2Palette(objPaletteId) ? Port_Coop_P2PaletteBase(objPaletteId) : objPaletteId;
+#else
+        const u32 basePaletteId = objPaletteId;
+#endif
+        if (basePaletteId < 0x16) {
             uVar3 = 1;
         } else {
             {
                 const u32* objPalTbl = gUnk_08133368;
                 if (REGION_IS_EU)
                     objPalTbl = gUnk_08133368_eu;
-                uVar3 = objPalTbl[objPaletteId - 0x16] >> 24;
+                uVar3 = objPalTbl[basePaletteId - 0x16] >> 24;
             }
             uVar3 &= 0xf;
         }
@@ -315,6 +323,19 @@ void ChangeObjPalette(Entity* entity, u32 objPaletteId) {
 void LoadObjPaletteAtIndex(u32 objPaletteId, u32 paletteIndex) {
     u16* buffer;
 
+#ifdef PC_PORT
+    {
+        /* Coop player 2: load the player palette it is a copy of, then tint. */
+        extern int Port_Coop_IsP2Palette(unsigned int paletteId);
+        extern unsigned int Port_Coop_P2PaletteBase(unsigned int paletteId);
+        extern void Port_Coop_TintP2Palette(unsigned short* colors);
+        if (Port_Coop_IsP2Palette(objPaletteId)) {
+            LoadObjPaletteAtIndex(Port_Coop_P2PaletteBase(objPaletteId), paletteIndex);
+            Port_Coop_TintP2Palette(gPaletteBuffer + (paletteIndex + 16) * 16);
+            return;
+        }
+    }
+#endif
     USE_PALETTE(paletteIndex + 16);
     if (objPaletteId > 5) {
         if (objPaletteId == 0x15) {

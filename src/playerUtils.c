@@ -2714,6 +2714,13 @@ void UpdatePlayerPalette(void) {
         gPlayerState.hurtBlinkSpeed--;
     }
     palette = GetPlayerPalette(FALSE);
+#ifdef PC_PORT
+    {
+        /* Coop: player 2 wears a red tunic (its own palette ids, port_coop.c). */
+        extern unsigned int Port_Coop_PlayerPalette(unsigned int paletteId);
+        palette = Port_Coop_PlayerPalette(palette);
+    }
+#endif
     if (palette != gPlayerState.playerPalette) {
         gPlayerState.playerPalette = palette;
         ChangeObjPalette(&gPlayerEntity.base, palette);
