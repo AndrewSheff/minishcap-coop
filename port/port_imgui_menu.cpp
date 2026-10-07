@@ -175,6 +175,27 @@ extern "C" void Port_ImGui_Init(SDL_Window* window, SDL_Renderer* renderer) {
      * are crisp enough at native resolution for menu use, and big
      * enough to be readable on the Deck at hand-held distance. */
     io.FontGlobalScale = 1.4f;
+    /* ProggyClean is ASCII-only; merge a system font for Cyrillic so the
+     * coop-test presets (coop_tests.json) can carry Russian descriptions.
+     * Glyphs load on demand (dynamic atlas), first readable path wins. */
+    {
+        static const char* const kCyrillicFonts[] = {
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "C:\\Windows\\Fonts\\arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        };
+        io.Fonts->AddFontDefault();
+        for (const char* path : kCyrillicFonts) {
+            if (FILE* f = std::fopen(path, "rb")) {
+                std::fclose(f);
+                ImFontConfig cfg;
+                cfg.MergeMode = true;
+                io.Fonts->AddFontFromFileTTF(path, 13.0f, &cfg);
+                break;
+            }
+        }
+    }
 #ifdef __ANDROID__
     /* Touch pass: a tablet is driven by fingers at arm's length, not a
      * pointer. Scale the whole style so every hit target clears ~48dp
@@ -1721,6 +1742,32 @@ extern "C" bool Port_ImGui_RenderPrelaunch(bool rom_present, const char* version
         CenteredText(rom_present ? "Press Enter or click Play to start"
                                  : "Press Enter or click to pick your .gba file");
         ImGui::PopStyleColor();
+
+        /* Coop-test quick start: one button per coop_tests.json preset,
+         * same as launching with TMC_COOP_TEST=<name>. */
+        if (rom_present && Port_CoopTest_PresetCount() > 0) {
+            ImGui::Dummy(ImVec2(0, 10));
+            ImGui::Separator();
+            ImGui::Dummy(ImVec2(0, 6));
+            ImGui::PushStyleColor(ImGuiCol_Text, accent);
+            CenteredText("Кооп-тест: сразу в комнату");
+            ImGui::PopStyleColor();
+            ImGui::Dummy(ImVec2(0, 4));
+            for (int i = 0; i < Port_CoopTest_PresetCount(); ++i) {
+                const PortCoopTestPreset* p = Port_CoopTest_Preset(i);
+                ImGui::PushID(i);
+                if (ImGui::Button(p->name, ImVec2(140.0f, 0))) {
+                    Port_CoopTest_Go(i);
+                    if (out_play)
+                        *out_play = true;
+                }
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, subtxt);
+                ImGui::TextWrapped("%s", p->description);
+                ImGui::PopStyleColor();
+                ImGui::PopID();
+            }
+        }
     }
     ImGui::End();
     ImGui::PopStyleVar(2);
