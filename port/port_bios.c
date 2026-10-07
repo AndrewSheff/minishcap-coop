@@ -153,16 +153,19 @@ static void Port_UpdateInput(void) {
     }
 
     /* Coop player 2: its buttons as a GBA held-keys mask (active-high), read
-     * by port_coop.c. START / SELECT are player 1's (menus, dialogue). */
+     * by port_coop.c. START opens player 2's own pause menu; SELECT (Ezlo,
+     * dialogue) stays player 1's. */
     {
         u16 p2 = 0;
         for (size_t i = 0; i < sizeof(sInputMap) / sizeof(sInputMap[0]); i++) {
-            if (sInputMap[i].gbaMask != START_BUTTON && sInputMap[i].gbaMask != SELECT_BUTTON &&
-                Port_Config_InputPressedP2(sInputMap[i].input)) {
+            if (sInputMap[i].gbaMask != SELECT_BUTTON && Port_Config_InputPressedP2(sInputMap[i].input)) {
                 p2 |= sInputMap[i].gbaMask;
             }
         }
         Port_Coop_SetP2Keys(p2);
+        /* Player 2 opened the pause menu: player 2's buttons drive it. */
+        if (Port_CoopItems_MenuIsP2())
+            keyinput = (u16)(0x03FF & ~p2);
         Port_Coop_FrameTick();
     }
 

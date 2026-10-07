@@ -175,6 +175,13 @@ u32 WriteSaveFile(u32 index, SaveFile* saveFile) {
         extern bool Port_RandoSave_SaveActiveSlot(int slot);
         Port_RandoSave_SaveActiveSlot((int)index);
     }
+    {
+        /* Coop: saving from player 2's pause menu keeps player 1's A/B. */
+        extern int Port_CoopItems_SaveImage(const SaveFile* in, SaveFile* out);
+        static SaveFile sCoopImage;
+        if (Port_CoopItems_SaveImage(saveFile, &sCoopImage))
+            return DataDoubleWriteWithStatus(index, &sCoopImage);
+    }
 #endif
     return DataDoubleWriteWithStatus(index, saveFile);
 }

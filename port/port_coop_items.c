@@ -9,32 +9,36 @@
  * site reads player 2's items with no change in src/; ammo and bombs come
  * from the shared counts.
  *
- * Player 2 has no pause menu (START is player 1's): holding its L (Y key)
- * and tapping B (U) or A (O) steps that slot through the owned items, in
- * pause-menu order, with a toast naming the item.
+ * Choosing: player 2 has its own Start. Pressed in play, it opens the game's
+ * own pause menu in "player 2 mode": the menu is driven by player 2's buttons
+ * (port_bios.c), shows and edits player 2's A/B (its choice stays in
+ * gSave.stats.equipped while the menu is open) and names items from the
+ * ROM. On close player 1's choice is put back. Saving from that menu writes
+ * player 1's choice into the save file (Port_CoopItems_SaveImage).
  */
 
 #include <stdio.h>
 #include <string.h>
 
 #include "global.h"
+#include "main.h"
+#include "game.h"
 #include "item.h"
-#include "itemMetaData.h"
 #include "save.h"
 #include "player.h"
-#include "pauseMenu.h"
 #include "port_coop.h"
-
-extern u32 GetInventoryValue(u32 item);
-extern void Port_DebugMenu_ToastFromExternal(const char* msg);
 
 #define COOP_FILENAME "tmc.coop"
 static const char kMagic[6] = { 'T', 'M', 'C', 'O', 'P', '1' };
 
-static u8 sEquip[2];     /* player 2's SLOT_A, SLOT_B */
-static u8 sSavedP1[2];   /* player 1's, while player 2's are swapped in */
+static u8 sEquip[2];   /* player 2's SLOT_A, SLOT_B */
+static u8 sSavedP1[2]; /* player 1's, while player 2's are swapped in */
 static int sLoaded;
 static int sSwapped;
+/* Player 2's pause menu: 1 = opened, waiting for the menu to start;
+ * 2 = the menu is running. */
+static int sMenuP2;
+static int sMenuWait;
 
 static void Save(void) {
     FILE* f = fopen(COOP_FILENAME ".tmp", "wb");
@@ -71,103 +75,21 @@ static void Load(void) {
     fclose(f);
 }
 
-/* The pause-menu grid: owned equippable items, one per menu slot (an
- * upgrade replaces its base item, as in the menu). Returns the count. */
-static int BuildGrid(u8* out) {
-    u8 grid[MENU_SLOT_COUNT];
-    u32 item;
-    int i, n = 0;
-    memset(grid, 0, sizeof(grid));
-    for (item = ITEM_SMITH_SWORD; item < ITEM_BOTTLE_EMPTY; item++) {
-        u32 slot = gItemMetaData[item].menuSlot;
-        if (GetInventoryValue(item) != 1 || slot >= MENU_SLOT_COUNT)
-            continue;
-        if (item == ITEM_OCARINA)
-            continue; /* warps the world: player 1's */
-        grid[slot] = (u8)((item == ITEM_LANTERN_OFF || item == ITEM_LANTERN_ON) ? gPauseMenuOptions.unk15 : item);
-    }
-    for (i = 0; i < MENU_SLOT_COUNT; i++)
-        if (grid[i] != 0)
-            out[n++] = grid[i];
-    return n;
-}
-
+/* Is item (as stored in an equip slot) still owned? Bottles and the
+ * lantern change id with their contents / state, so they count by kind. */
 static int Owned(u8 item) {
-    u8 grid[MENU_SLOT_COUNT];
-    int n = BuildGrid(grid), i;
-    for (i = 0; i < n; i++)
-        if (grid[i] == item)
-            return 1;
-    return 0;
-}
-
-static const char* ItemName(u8 id) {
-    switch (id) {
-        case ITEM_NONE: return "(пусто)";
-        case ITEM_SMITH_SWORD: case ITEM_GREEN_SWORD: case ITEM_RED_SWORD: case ITEM_BLUE_SWORD:
-        case ITEM_FOURSWORD: return "меч";
-        case ITEM_BOMBS: return "бомбы";
-        case ITEM_REMOTE_BOMBS: return "бомбы с пультом";
-        case ITEM_BOW: return "лук";
-        case ITEM_LIGHT_ARROW: return "лук (свет)";
-        case ITEM_BOOMERANG: return "бумеранг";
-        case ITEM_MAGIC_BOOMERANG: return "волшебный бумеранг";
-        case ITEM_SHIELD: return "щит";
-        case ITEM_MIRROR_SHIELD: return "зеркальный щит";
-        case ITEM_LANTERN_OFF: case ITEM_LANTERN_ON: return "фонарь";
-        case ITEM_GUST_JAR: return "кувшин ветра";
-        case ITEM_PACCI_CANE: return "трость Пачи";
-        case ITEM_MOLE_MITTS: return "кротовые рукавицы";
-        case ITEM_ROCS_CAPE: return "плащ Рок";
-        case ITEM_PEGASUS_BOOTS: return "сапоги Пегаса";
-        case ITEM_FIRE_ROD: return "огненный жезл";
-        case ITEM_BOTTLE1: case ITEM_BOTTLE2: case ITEM_BOTTLE3: case ITEM_BOTTLE4: return "бутылка";
-        default: return "предмет";
-    }
-}
-
-/* Step slot (0 = A, 1 = B) to the next owned item, skipping the one in
- * player 2's other slot (as the menu would swap them). */
-static void Cycle(int slot) {
-    u8 grid[MENU_SLOT_COUNT];
-    int n = BuildGrid(grid), i, cur = -1;
-    char msg[96];
-    if (n == 0)
-        return;
-    for (i = 0; i < n; i++)
-        if (grid[i] == sEquip[slot])
-            cur = i;
-    for (i = 1; i <= n; i++) {
-        u8 cand = grid[(cur + i + n) % n];
-        if (cand != sEquip[1 - slot] || n == 1) {
-            sEquip[slot] = cand;
-            break;
-        }
-    }
-    Save();
-    snprintf(msg, sizeof(msg), "Игрок 2 · %s: %s", slot == 0 ? "A" : "B", ItemName(sEquip[slot]));
-    Port_DebugMenu_ToastFromExternal(msg);
-}
-
-unsigned short Port_CoopItems_FilterKeys(unsigned short held, unsigned short newKeys) {
-    if (!sLoaded)
-        Load();
-    /* L is player 2's item-select modifier, never a game input (kinstone
-     * fusion is player 1's). With L held, A / B pick items instead. */
-    if (held & L_BUTTON) {
-        if (newKeys & B_BUTTON)
-            Cycle(1);
-        if (newKeys & A_BUTTON)
-            Cycle(0);
-        held &= (unsigned short)~(A_BUTTON | B_BUTTON);
-    }
-    return (unsigned short)(held & ~L_BUTTON);
+    extern u32 GetInventoryValue(u32 item);
+    if (item == ITEM_NONE)
+        return 1;
+    if (item == ITEM_LANTERN_ON)
+        item = ITEM_LANTERN_OFF;
+    return GetInventoryValue(item) == 1;
 }
 
 void Port_CoopItems_Enter(void) {
     if (!sLoaded)
         Load();
-    if (sSwapped)
+    if (sSwapped || sMenuP2)
         return;
     sSwapped = 1;
     sSavedP1[0] = gSave.stats.equipped[SLOT_A];
@@ -177,20 +99,72 @@ void Port_CoopItems_Enter(void) {
 }
 
 void Port_CoopItems_Leave(void) {
-    if (!sSwapped)
-        return;
+    if (!sSwapped || sMenuP2)
+        return; /* player 2's menu keeps player 2's choice in place */
     sSwapped = 0;
     /* Keep what player 2's code changed (lantern on/off, emptied bottle). */
-    if (gSave.stats.equipped[SLOT_A] != ITEM_NONE)
-        sEquip[0] = gSave.stats.equipped[SLOT_A];
-    if (gSave.stats.equipped[SLOT_B] != ITEM_NONE)
-        sEquip[1] = gSave.stats.equipped[SLOT_B];
+    sEquip[0] = gSave.stats.equipped[SLOT_A];
+    sEquip[1] = gSave.stats.equipped[SLOT_B];
     gSave.stats.equipped[SLOT_A] = sSavedP1[0];
     gSave.stats.equipped[SLOT_B] = sSavedP1[1];
+}
+
+/* InitPauseMenu hook (src/player.c CheckInitPauseMenu): player 2 pressed its
+ * Start during its own update. */
+void Port_CoopItems_OnPauseMenuOpen(void) {
+    if (Port_Coop_CurrentPlayer() != 1 || !sSwapped)
+        return;
+    sMenuP2 = 1;
+    sMenuWait = 60;
+}
+
+int Port_CoopItems_MenuIsP2(void) {
+    return sMenuP2 != 0;
+}
+
+/* Once per frame (Port_Coop_FrameTick, between frames): notice the menu
+ * starting and closing; on close store player 2's pick, restore player 1's. */
+void Port_CoopItems_FrameTick(void) {
+    const int inGame = gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN && gMain.substate == GAMEMAIN_UPDATE;
+    if (!sMenuP2)
+        return;
+    if (sMenuP2 == 1) {
+        if (!inGame) {
+            sMenuP2 = 2; /* the menu took over */
+        } else if (--sMenuWait <= 0) {
+            sMenuP2 = 2; /* never opened: close it out below */
+        } else {
+            return;
+        }
+    }
+    if (!inGame && gMain.task == TASK_GAME)
+        return; /* still in the menu */
+    sMenuP2 = 0;
+    sSwapped = 0;
+    sEquip[0] = gSave.stats.equipped[SLOT_A];
+    sEquip[1] = gSave.stats.equipped[SLOT_B];
+    gSave.stats.equipped[SLOT_A] = sSavedP1[0];
+    gSave.stats.equipped[SLOT_B] = sSavedP1[1];
+    Save();
+}
+
+/* WriteSaveFile hook: saving from player 2's menu must not store player
+ * 2's A/B as player 1's. Returns 1 and fills *out with the image to write. */
+int Port_CoopItems_SaveImage(const SaveFile* in, SaveFile* out) {
+    if (!sMenuP2 && !sSwapped)
+        return 0;
+    *out = *in;
+    out->stats.equipped[SLOT_A] = sSavedP1[0];
+    out->stats.equipped[SLOT_B] = sSavedP1[1];
+    return 1;
 }
 
 unsigned char Port_CoopItems_Equipped(int slot) {
     if (!sLoaded)
         Load();
-    return (slot == 0 || slot == 1) ? sEquip[slot] : 0;
+    if (slot != 0 && slot != 1)
+        return 0;
+    if (sSwapped || sMenuP2)
+        return gSave.stats.equipped[slot]; /* player 2's are in place */
+    return Owned(sEquip[slot]) ? sEquip[slot] : ITEM_NONE;
 }

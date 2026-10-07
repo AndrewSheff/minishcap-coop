@@ -40,8 +40,10 @@ void Port_Coop_OnEntityAppended(void* entity);
 int Port_Coop_CurrentPlayer(void);
 
 /* Player 2's own A/B items (port_coop_items.c). */
-unsigned short Port_CoopItems_FilterKeys(unsigned short held, unsigned short newKeys);
 void Port_CoopItems_Enter(void);
+void Port_CoopItems_OnPauseMenuOpen(void);
+int Port_CoopItems_MenuIsP2(void);
+void Port_CoopItems_FrameTick(void);
 void Port_CoopItems_Leave(void);
 unsigned char Port_CoopItems_Equipped(int slot);
 

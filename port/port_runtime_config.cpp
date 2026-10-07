@@ -89,11 +89,13 @@ const std::array<Def, PORT_INPUT_COUNT> kDefaults = { {
     { PORT_INPUT_ROLL_ATTACK, "roll_attack", { "SDLK:0x00000064", "SDL_GAMEPAD:0x00000008" } },
 } };
 
-/* Coop player 2 keyboard defaults (GBA buttons only; START/SELECT stay with
- * player 1, who owns menus and dialogue). I/J/K/L move, U = B (sword),
- * O = A, H = R, Y = L. P is avoided: it is the practice-mode pause key. A
+/* Coop player 2 keyboard defaults (GBA buttons; SELECT stays with player 1,
+ * who owns dialogue). I/J/K/L move, U = B (sword), O = A, H = R, Y = L,
+ * N = Start (player 2's pause menu). P is avoided: it is the practice-mode
+ * pause key. A
  * second gamepad (see p2_gamepad) uses player 1's pad bindings. */
-const std::array<Def, 8> kP2Defaults = { {
+const std::array<Def, 9> kP2Defaults = { {
+    { PORT_INPUT_START, "start", { "SDLK:0x0000006e" } },
     { PORT_INPUT_A, "a", { "SDLK:0x0000006f" } },
     { PORT_INPUT_B, "b", { "SDLK:0x00000075" } },
     { PORT_INPUT_RIGHT, "right", { "SDLK:0x0000006c" } },

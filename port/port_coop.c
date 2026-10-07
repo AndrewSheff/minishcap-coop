@@ -105,8 +105,30 @@ static void SetCurrent(int idx) {
     gPortCurCarriedEntity = &gPortCarriedEntities[idx];
 }
 
+static int P2Linked(void);
+
 u32 Port_Coop_PlayerGfxSlot(Entity* player) {
     return player == P2 ? 0 /* any free slot */ : 2;
+}
+
+/* Player 2 takes two slots: its animation tiles in the first (as player 1's
+ * one slot), its HUD item icons in the second (src/ui.c). Compaction moves
+ * both together and updates spriteVramOffset, so the HUD follows. */
+u32 Port_Coop_PlayerGfxCount(Entity* player) {
+    return player == P2 ? 2 : 1;
+}
+
+int Port_Coop_HudTileBase(void) {
+    const Entity* p2 = P2;
+    /* Not linked = an area load reset the slots and player 2 is about to
+     * be spawned again: its old slot index is stale. */
+    if (!sP2Active || p2->spriteAnimation[0] == 0 || !P2Linked())
+        return -1;
+    return p2->spriteVramOffset + 0x10;
+}
+
+int Port_Coop_HudVisible(void) {
+    return sP2Active && !sHidden && gMain.task == TASK_GAME;
 }
 
 unsigned int Port_Coop_PlayerItemGfxSlot(void) {
@@ -606,6 +628,7 @@ static int GameplayLive(void) {
 }
 
 void Port_Coop_FrameTick(void) {
+    Port_CoopItems_FrameTick(); /* player 2's pause menu opening / closing */
     /* Player 2's gInput for this frame. */
     sP2Input.heldKeys = sP2Held;
     sP2Input.newKeys = (u16)(sP2Held & ~sP2PrevHeld);
@@ -691,15 +714,6 @@ void Port_Coop_FrameTick(void) {
                 COLLISION_ON(p2);
             }
             return;
-        }
-        {
-            /* Player 2's buttons for its next update: L (Y key) + B / A
-             * steps its item slots instead of playing (port_coop_items.c). */
-            static unsigned short sPrevFiltered;
-            const unsigned short held = Port_CoopItems_FilterKeys(sP2Held, (u16)(sP2Held & ~sP2PrevHeld));
-            sP2Input.heldKeys = held;
-            sP2Input.newKeys = (u16)(held & ~sPrevFiltered);
-            sPrevFiltered = held;
         }
         if (sSpawnSettle > 0) {
             sSpawnSettle--;
