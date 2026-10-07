@@ -931,7 +931,8 @@ static int AreaBannerActive(void) {
 
 static int GameplayLive(void) {
     const Entity* p1 = &gPortPlayerEntities[0].base;
-    return gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN && gMain.substate == GAMEMAIN_UPDATE &&
+    return gMain.task == TASK_GAME && gMain.state == GAMETASK_MAIN &&
+           (gMain.substate == GAMEMAIN_UPDATE || gMain.substate == GAMEMAIN_BARRELUPDATE) &&
            gRoomControls.camera_target != NULL && gSave.stats.health != 0 && p1->kind == PLAYER;
 }
 
@@ -1045,8 +1046,12 @@ void Port_Coop_FrameTick(void) {
          * player 2 rides along as a passenger, and gets off where player 1
          * does. */
         const PlayerState* p1s = &gPortPlayerStates[0];
-        const int ride = (p1s->flags & (PL_IN_MINECART | PL_PARACHUTE)) != 0 ||
-                         gPortPlayerEntities[0].base.action == PLAYER_PARACHUTE;
+        /* (PL_FLAGS2: standing on a carrier that moves player 1 — large
+         * lilypads, Cloud Tops clouds, Enemy64; the Deepwood rolling barrel
+         * turns player 1 inside it: player 2 rides along there too.) */
+        const int ride = (p1s->flags & (PL_IN_MINECART | PL_PARACHUTE | PL_FLAGS2)) != 0 ||
+                         gPortPlayerEntities[0].base.action == PLAYER_PARACHUTE ||
+                         gMain.substate == GAMEMAIN_BARRELUPDATE;
         if (ride && gPortCoopState.koTimer == 0) {
             if (sHidden) {
                 /* Put away while boarding: back on screen as a passenger. */
