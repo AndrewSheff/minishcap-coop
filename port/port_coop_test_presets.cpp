@@ -74,6 +74,7 @@ extern "C" int Port_CoopTest_LoadPresets(PortCoopTestPreset* out, int max, char*
         p->layer = (unsigned char)l;
         p->all_items = e.value("all_items", true) ? 1 : 0;
         p->mid_game_flags = e.value("mid_game_flags", true) ? 1 : 0;
+        p->safe_spawn = e.value("safe_spawn", false) ? 1 : 0;
     }
     return n;
 }

@@ -164,6 +164,11 @@ static void BootIntoPreset(int i, unsigned int frame) {
     if (Rando_IsActive())
         Rando_Reset();
     ApplySaveState(p);
+    if (p->safe_spawn) {
+        /* The save start skips the debug warp's safe-spawn nudge; presets
+         * whose point isn't hand-checked ask for it. */
+        Port_DebugAction_ArmWarpNudge(a, r);
+    }
     Port_Coop_RequestJoin(); /* coop test: player 2 is there from the start */
     SetTask(TASK_GAME);
     sSkipResumeHint = 1;

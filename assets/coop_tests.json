@@ -42,6 +42,30 @@
       "warp": "0x22,0x11,0x78,0x78,1",
       "all_items": true,
       "mid_game_flags": true
+    },
+    {
+      "name": "pots",
+      "description": "Храм Deepwood, комната с горшками: восемь горшков. Поднять (R — у игрока 2 клавиша H), нести, бросить.",
+      "warp": "0x48,0x11,0x78,0x60,1",
+      "all_items": true,
+      "mid_game_flags": true,
+      "safe_spawn": true
+    },
+    {
+      "name": "grabbers",
+      "description": "Пещера у Лесного озера: четыре Like-Like и Rupee Like. Хватают и глотают — того Линка, которого поймали.",
+      "warp": "0x0c,0x00,0x260,0x288,1",
+      "all_items": true,
+      "mid_game_flags": true,
+      "safe_spawn": true
+    },
+    {
+      "name": "shooters",
+      "description": "Hyrule Field, восточные холмы: Октороки плюются камнями в ближайшего Линка.",
+      "warp": "0x03,0x04,0x148,0x138,1",
+      "all_items": true,
+      "mid_game_flags": true,
+      "safe_spawn": true
     }
   ]
 }

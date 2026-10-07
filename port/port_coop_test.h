@@ -22,6 +22,7 @@ typedef struct PortCoopTestPreset {
     unsigned short y;
     int all_items;      /* Port_DebugAction_GiveAllItems() */
     int mid_game_flags; /* story-skip + world-open globals */
+    int safe_spawn;     /* nudge Link off collision / pits on arrival */
 } PortCoopTestPreset;
 
 /* port_coop_test_presets.cpp: parse coop_tests.json (exe dir, then cwd).
