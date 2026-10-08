@@ -76,5 +76,7 @@ TMC_COOP_TEST=enemies ./tmc_pc
 - [999sian/tmc — Project Picori](https://github.com/999sian/tmc): PC-порт, на котором построен мод.
 - [zeldaret/tmc](https://github.com/zeldaret/tmc): декомпиляция *The Minish Cap*.
 
+Кооператив разработан с помощью [Claude Code](https://claude.com/claude-code).
+
 Код распространяется под той же лицензией, что и порт: GPL-3.0, см. [LICENSE](LICENSE). *The Legend of Zelda* и *The Minish Cap* принадлежат Nintendo. Мод не содержит ROM и данных из него.
 

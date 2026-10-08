@@ -87,4 +87,6 @@ The presets are defined in `assets/coop_tests.json`.
 - [zeldaret/tmc](https://github.com/zeldaret/tmc): the decompilation of *The Minish Cap*.
 - [agbplay](https://github.com/ipatix/agbplay) and the other libraries listed in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 
+The co-op mod was developed with the help of [Claude Code](https://claude.com/claude-code).
+
 Licensed under GPL-3.0, like the port; see [LICENSE](LICENSE). *The Legend of Zelda* and *The Minish Cap* are trademarks of Nintendo. This project contains no ROM and no data taken from one.
