@@ -4,6 +4,8 @@
 
 # Project Picori — Minish Cap PC Port
 
+> **Picori Co-op v0.1.0** — this fork adds local two-player co-op (a second Link). See [README-COOP.md](README-COOP.md) / локальный кооператив на двоих — см. [README-COOP.md](README-COOP.md).
+
 A native PC port of *The Legend of Zelda: The Minish Cap* (GBA, 2004) built on
 SDL3, a vendored software PPU renderer (`port/ppu`), and the agbplay audio engine.
 Targets **x86-64 Linux, Windows, and macOS** (Apple Silicon and Intel).

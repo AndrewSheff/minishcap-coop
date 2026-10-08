@@ -1,5 +1,31 @@
 # Changelog
 
+## Picori Co-op v0.1.0 (2026-10-08)
+
+Local two-player co-op on top of port v0.9.5. See [README-COOP.md](README-COOP.md).
+
+- A second Link joins with its own keys (I/J/K/L, O, U, H, Y, N) or the second
+  gamepad. It has its own A/B items, chosen in its own pause menu, and its own
+  hearts (or shared ones with `coop_shared_hearts`). Its HUD sits at the top
+  centre.
+- Enemies and bosses pick the nearer Link. The camera frames both Links, kept
+  within one screen of each other. Dark rooms widen the light circle for two
+  lanterns.
+- Player 2 presses buttons and plates, carries pots and pushes blocks. It
+  opens chests and doors, reads signs, talks to NPCs and fuses kinstones.
+- Moving platforms, lilypads, clouds, minecarts, the Deepwood barrel, Gleerok
+  and Gyorg carry both Links.
+- Player 1 drives room transitions, portals, cutscenes, shops and minigames:
+  player 2 rides along or waits and reappears beside player 1.
+- A knocked-out player 2 returns after 3 s; only player 1 at zero hearts ends
+  the game.
+- Player 2's items and hearts are saved per slot in `tmc.coop` (the `.sav` is
+  unchanged) and in quicksaves (format v11: older quicksaves are rejected).
+- Gamepads keep their player by device id across hotplug. Item limits
+  (bombs, boomerang, sword beam) count per Link.
+- Coop test mode: `TMC_COOP_TEST=<preset>` or the launch-screen buttons drop
+  you into a test room (`assets/coop_tests.json`).
+
 ## v0.9.5 (2026-09-28)
 
 - Engine and runtime data loader modernization: all ROM symbol tables and
