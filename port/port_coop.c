@@ -37,6 +37,7 @@
 #include "enemy.h"
 #include "manager.h"
 #include "object.h"
+#include "npc.h"
 #include "port_coop.h"
 #include "port_runtime_config.h"
 
@@ -939,8 +940,11 @@ static int AreaBannerActive(void) {
 }
 
 /* A minigame run by player 1 is on: Anju's cucco roundup (its CUCCO_MINIGAME
- * object lives only while the timer runs). Player 2 is put away for it —
- * the angry cuccos would chase it and the result is player 1's. */
+ * object lives only while the timer runs), or Borlov's double-or-nothing
+ * chest game (its chest controller, the PICOLYTE_BOTTLE npc with
+ * script_CarlovChest, exists only in that game's room). Player 2 is put away
+ * for it — the angry cuccos would chase it, and a chest it opened would be
+ * player 1's pick. */
 static int MinigameActive(void) {
     int i;
     for (i = 0; i < 9; i++) {
@@ -948,7 +952,7 @@ static int MinigameActive(void) {
         Entity* e = list->first;
         int steps = 0;
         while (e != NULL && e != (Entity*)list && steps++ < 96) {
-            if (e->kind == OBJECT && e->id == CUCCO_MINIGAME)
+            if ((e->kind == OBJECT && e->id == CUCCO_MINIGAME) || (e->kind == NPC && e->id == PICOLYTE_BOTTLE))
                 return 1;
             e = e->next;
         }

@@ -269,6 +269,21 @@ void PlayerUpdate(PlayerEntity* this) {
     UpdatePlayerPalette();
 }
 
+#ifdef PC_PORT
+/* Coop: both Links low on hearts beep once, not twice on the same frame. */
+extern int Port_Coop_CurrentPlayer(void);
+static void LowHealthBeep(void) {
+    static s32 sLastBeepFrame = -1;
+    if (sLastBeepFrame == gRoomTransition.frameCount)
+        return;
+    sLastBeepFrame = gRoomTransition.frameCount;
+    EnqueueSFX(SFX_LOW_HEALTH);
+}
+#define LOW_HEALTH_BEEP() LowHealthBeep()
+#else
+#define LOW_HEALTH_BEEP() EnqueueSFX(SFX_LOW_HEALTH)
+#endif
+
 // Responsible for some life things like low health beep and initiating the death sequence
 static void HandlePlayerLife(Entity* this) {
     u32 threshold;
@@ -311,11 +326,18 @@ static void HandlePlayerLife(Entity* this) {
                 threshold = 8;
 
             if (gSave.stats.health <= threshold) {
-                EnqueueSFX(SFX_LOW_HEALTH);
+                LOW_HEALTH_BEEP();
             }
         }
     } else {
         // TODO: why does message state affect health drops in US/JP?
+#ifdef PC_PORT
+        /* Coop: player 2's update runs after player 1's — keep player 1's
+         * low-health request rather than overwriting it. */
+        if (Port_Coop_CurrentPlayer() == 1)
+            gRoomVars.needHealthDrop |= gMessage.state & MESSAGE_ACTIVE;
+        else
+#endif
         gRoomVars.needHealthDrop = gMessage.state & MESSAGE_ACTIVE;
         threshold = gSave.stats.maxHealth / 4;
         if (threshold > 24)
@@ -326,7 +348,7 @@ static void HandlePlayerLife(Entity* this) {
         if (gSave.stats.health <= threshold) {
             gRoomVars.needHealthDrop = TRUE;
             if ((gHUD.hideFlags == HUD_HIDE_NONE) && gRoomTransition.frameCount % 90 == 0) {
-                EnqueueSFX(SFX_LOW_HEALTH);
+                LOW_HEALTH_BEEP();
             }
         }
     }
