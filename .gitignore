@@ -159,3 +159,10 @@ android/local.properties
 android/.gradle/
 android/app/build/
 
+
+# Picori Co-op: per-user runtime state and anything derived from the ROM.
+tmc.coop
+state_*.bin
+assets_src/
+capture.png
+/coop_tests.json
