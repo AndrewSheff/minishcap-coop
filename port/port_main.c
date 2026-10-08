@@ -1,3 +1,4 @@
+#include "port_version.h"
 #include "gba/io_reg.h"
 #include "main.h"
 #include <stdbool.h>
@@ -540,7 +541,7 @@ int main(int argc, char* argv[]) {
 #endif
     /* TMC_PC_VERSION is defined by xmake.lua via add_defines("TMC_PC_VERSION=\"...\"") */
     char window_title[64];
-    SDL_snprintf(window_title, sizeof(window_title), "The Minish Cap " TMC_PC_VERSION);
+    SDL_snprintf(window_title, sizeof(window_title), "The Minish Cap " TMC_PC_VERSION TMC_COOP_TITLE);
 #ifdef TMC_GPU_RENDERER
     /* SDL_GPU wants exclusive ownership of the window's swapchain
      * surface. If we go through SDL_CreateWindowAndRenderer, the

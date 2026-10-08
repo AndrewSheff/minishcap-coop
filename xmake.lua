@@ -1,6 +1,8 @@
 set_project("tmc")
 -- Keep in sync with port/port_version.h.
 local TMC_PC_VERSION = "0.9.5"
+-- Picori Co-op (local two-player mod) release version.
+local TMC_COOP_VERSION = "0.1.0"
 set_version(TMC_PC_VERSION)
 set_xmakever("2.7.0")
 
@@ -623,6 +625,7 @@ target("tmc_pc")
     -- Inject the version string from the top-of-file constant so the
     add_defines('TMC_PC_VERSION="' .. TMC_PC_VERSION .. '"')
     add_defines('TMC_PORT_VERSION="' .. TMC_PC_VERSION .. '"')
+    add_defines('TMC_COOP_VERSION="' .. TMC_COOP_VERSION .. '"')
 
     -- Multi-region fat binary: switch REGION_IS_* (include/region.h) to runtime.
     -- Force-include region.h everywhere so converted gameplay-behavior sites and

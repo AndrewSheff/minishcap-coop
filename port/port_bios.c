@@ -1,3 +1,4 @@
+#include "port_version.h"
 #include "gba/io_reg.h"
 #include "save.h" /* gSave for Discord-RPC stat reads */
 #include "main.h"
@@ -1066,9 +1067,9 @@ void VBlankIntrWait(void) {
 #define TMC_PORT_VERSION "0.5.0"
 #endif
         if (decoupled) {
-            SDL_snprintf(title, sizeof(title), "The Minish Cap " TMC_PORT_VERSION " - %.1f FPS / %.1f TPS", fps, tps);
+            SDL_snprintf(title, sizeof(title), "The Minish Cap " TMC_PORT_VERSION TMC_COOP_TITLE " - %.1f FPS / %.1f TPS", fps, tps);
         } else {
-            SDL_snprintf(title, sizeof(title), "The Minish Cap " TMC_PORT_VERSION " - %.1f FPS", fps);
+            SDL_snprintf(title, sizeof(title), "The Minish Cap " TMC_PORT_VERSION TMC_COOP_TITLE " - %.1f FPS", fps);
         }
         Port_PPU_SetWindowTitle(title);
 #ifdef __ANDROID__
