@@ -45,6 +45,37 @@ git rev-parse --verify --quiet "refs/heads/$BRANCH" >/dev/null || fail "нет �
 git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null || fail "нет локального тега $TAG"
 
 LOGIN="$(gh api user --jq .login)"
+GH_ID="$(gh api user --jq .id)"
+NOREPLY="$GH_ID+$LOGIN@users.noreply.github.com"
+PLACEHOLDER="andrew@users.noreply.github.com"
+
+# Local commits carry a placeholder author; on publish they get your GitHub
+# noreply address (author, committer and the tag's tagger).
+if git log --format='%ae%n%ce' "refs/remotes/origin/master..refs/heads/$BRANCH" | grep -qx "$PLACEHOLDER"; then
+    say "Ставлю в коммиты твой noreply-адрес GitHub"
+    [ -z "$(git status --porcelain --untracked-files=no)" ] || fail "в репозитории есть незакоммиченные изменения"
+    PREV_BRANCH="$(git symbolic-ref --quiet --short HEAD || true)"
+    [ "$PREV_BRANCH" = "$BRANCH" ] || git checkout --quiet "$BRANCH"
+    git tag -d "$TAG" >/dev/null
+    FILTER_BRANCH_SQUELCH_WARNING=1 NOREPLY="$NOREPLY" PLACEHOLDER="$PLACEHOLDER" \
+        git filter-branch -f --env-filter '
+            [ "$GIT_AUTHOR_EMAIL" = "$PLACEHOLDER" ] && export GIT_AUTHOR_EMAIL="$NOREPLY"
+            [ "$GIT_COMMITTER_EMAIL" = "$PLACEHOLDER" ] && export GIT_COMMITTER_EMAIL="$NOREPLY"
+            true' -- "refs/remotes/origin/master..refs/heads/$BRANCH" >/dev/null
+    git update-ref -d "refs/original/refs/heads/$BRANCH" 2>/dev/null || true
+    GIT_COMMITTER_NAME="$(git config user.name)" GIT_COMMITTER_EMAIL="$NOREPLY" \
+        git tag -a "$TAG" -m "Picori Co-op $TAG" "refs/heads/$BRANCH"
+    [ -z "$PREV_BRANCH" ] || [ "$PREV_BRANCH" = "$BRANCH" ] || git checkout --quiet "$PREV_BRANCH"
+fi
+
+# Only your GitHub noreply address may go out: commits and tag are checked.
+BAD_EMAILS="$( { git log --format='%ae%n%ce' "refs/remotes/origin/master..refs/heads/$BRANCH";
+    git cat-file -p "refs/tags/$TAG" | sed -n 's/^tagger .*<\(.*\)>.*/\1/p'; } |
+    grep -vx "$NOREPLY" | sort -u || true)"
+if [ -n "$BAD_EMAILS" ]; then
+    fail "в коммитах или теге есть почта, отличная от твоего noreply-адреса GitHub ($NOREPLY). Публикация остановлена, ничего не отправлено."
+fi
+
 say "Аккаунт GitHub: $LOGIN"
 
 # The fork: minishcap-coop, or an earlier fork of 999sian/tmc under another name.
