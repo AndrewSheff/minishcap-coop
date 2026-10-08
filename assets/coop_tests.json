@@ -1,51 +1,51 @@
 {
-  "_comment": "Пресеты кооп-теста. Запуск: двойной клик по «Кооп-тест.command» и кнопка комнаты, или TMC_COOP_TEST=<name> ./tmc_pc. warp = area,room,x,y,layer (пиксели от угла комнаты, 0x-hex можно; layer 1 = нижний слой). all_items / mid_game_flags по умолчанию true.",
+  "_comment": "Co-op test presets. Start one from the launch screen buttons, F8 -> Coop Test, or TMC_COOP_TEST=<name> ./tmc_pc. warp = area,room,x,y,layer (pixels from the room's top-left corner, 0x hex allowed; layer 1 = bottom layer). all_items / mid_game_flags default to true.",
   "presets": [
     {
       "name": "enemies",
-      "description": "Храм Deepwood, комната с колоннами: шесть слизней-Слаггул. Бой, удары, отбрасывание.",
+      "description": "Deepwood Shrine, pillar room: six Sluggulas. Fighting, hits, knockback.",
       "warp": "0x48,0x09,0x88,0xa8,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "buttons",
-      "description": "Храм Deepwood: кнопка на полу рядом с Линком. Встать на неё и сойти.",
+      "description": "Deepwood Shrine: a floor button next to Link. Step on it and off.",
       "warp": "0x48,0x07,0x58,0xc8,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "push",
-      "description": "Храм Deepwood: статуи-блоки вокруг нажимной плиты. Толкать и тянуть.",
+      "description": "Deepwood Shrine: block statues around a pressure plate. Push and pull.",
       "warp": "0x48,0x04,0x88,0x88,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "transition",
-      "description": "Храм Deepwood: Линк в открытом южном проёме. Шаг вниз — переход в соседнюю комнату.",
+      "description": "Deepwood Shrine: Link stands in the open south doorway. One step down moves to the next room.",
       "warp": "0x48,0x08,0x88,0xa0,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "portal",
-      "description": "Западный лес (Hyrule Field): пенёк-портал прямо над Линком. Зайти на него и нажать R (клавиша S).",
+      "description": "Western Wood (Hyrule Field): a portal stump right above Link. Step on it and press R (S key).",
       "warp": "0x03,0x00,0x78,0xa0,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "npc",
-      "description": "Дом Линка, мастерская: кузнец Смит в комнате. Подойти и поговорить (A — клавиша X).",
+      "description": "Link's house, the workshop: Smith is in the room. Walk up and talk (A, X key).",
       "warp": "0x22,0x11,0x78,0x78,1",
       "all_items": true,
       "mid_game_flags": true
     },
     {
       "name": "pots",
-      "description": "Храм Deepwood, комната с горшками: восемь горшков. Поднять (R — у игрока 2 клавиша H), нести, бросить.",
+      "description": "Deepwood Shrine, pot room: eight pots. Lift (R; player 2: H key), carry, throw.",
       "warp": "0x48,0x11,0x78,0x60,1",
       "all_items": true,
       "mid_game_flags": true,
@@ -53,7 +53,7 @@
     },
     {
       "name": "grabbers",
-      "description": "Пещера у Лесного озера: четыре Like-Like и Rupee Like. Хватают и глотают — того Линка, которого поймали.",
+      "description": "Cave by Lake Hylia: four Like Likes and a Rupee Like. They grab and swallow whichever Link they catch.",
       "warp": "0x0c,0x00,0x260,0x288,1",
       "all_items": true,
       "mid_game_flags": true,
@@ -61,7 +61,7 @@
     },
     {
       "name": "shooters",
-      "description": "Hyrule Field, восточные холмы: Октороки плюются камнями в ближайшего Линка.",
+      "description": "Hyrule Field, eastern hills: Octoroks spit rocks at the nearest Link.",
       "warp": "0x03,0x04,0x148,0x138,1",
       "all_items": true,
       "mid_game_flags": true,
@@ -69,7 +69,7 @@
     },
     {
       "name": "boss-chuchu",
-      "description": "Храм Deepwood, зал босса: Big ChuChu. Босс бьёт и выбирает ближайшего Линка.",
+      "description": "Deepwood Shrine, boss room: Big ChuChu. The boss attacks and picks the nearest Link.",
       "warp": "0x49,0x00,0x80,0xe0,1",
       "all_items": true,
       "mid_game_flags": true,
@@ -77,7 +77,7 @@
     },
     {
       "name": "boss-gleerok",
-      "description": "Пещера огня, перед дверью босса: пройди вверх в большую дверь — бой с Gleerok начнётся как в обычной игре. Плевки летят в ближайшего Линка; стоять на его теле — только Линк 1.",
+      "description": "Cave of Flames, in front of the boss door: go up through the big door and the Gleerok fight starts as in a normal game. Fireballs fly at the nearest Link; only player 1 can stand on its body.",
       "warp": "0x50,0x17,0xa8,0x58,1",
       "all_items": true,
       "mid_game_flags": true,

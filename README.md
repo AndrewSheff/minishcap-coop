@@ -2,258 +2,89 @@
   <img src="docs/picori-logo.png" alt="Project Picori" width="240">
 </p>
 
-# Project Picori — Minish Cap PC Port
+# Picori Co-op — local co-op for The Minish Cap
 
-> **Picori Co-op v0.1.0** — this fork adds local two-player co-op (a second Link). See [README-COOP.md](README-COOP.md) / локальный кооператив на двоих — см. [README-COOP.md](README-COOP.md).
+[Русская версия](README.ru.md)
 
-A native PC port of *The Legend of Zelda: The Minish Cap* (GBA, 2004) built on
-SDL3, a vendored software PPU renderer (`port/ppu`), and the agbplay audio engine.
-Targets **x86-64 Linux, Windows, and macOS** (Apple Silicon and Intel).
+Picori Co-op adds a second Link to [Project Picori](https://github.com/999sian/tmc), the native PC port of *The Legend of Zelda: The Minish Cap*. Two players go through the whole game together on one screen, using keyboard or gamepads.
 
-The port is **work in progress** — many rendering and gameplay paths are still
-rough; please file issues for anything that breaks.
+Version **v0.1.0**, built on port 0.9.5. The window title shows the version. The original port's README is in [README-PICORI.md](README-PICORI.md).
 
-## Supported ROMs
+## Features
 
-A copy of the original game is required. This repository does **not** ship ROMs.
+- **A second Link** with his own A/B items and his own hearts. Hearts can be shared instead (`coop_shared_hearts`).
+- **The camera** keeps both Links in view. They can't walk more than a screen apart.
+- **Enemies and bosses** go after the nearer Link.
+- **Player 2 can:**
+  - press floor buttons and pressure plates;
+  - lift, carry and throw pots;
+  - push blocks;
+  - open chests and doors;
+  - read signs;
+  - talk to NPCs and fuse kinstones.
+- **Moving platforms, lilypads, clouds, minecarts, the Deepwood barrel, Gleerok and Gyorg** carry both Links.
+- **Player 1 leads room transitions, portals, cutscenes, shops and minigames.** Player 2 rides along or steps aside, then reappears next to player 1. Both Links shrink to Minish size together.
+- **Knock-out:** if player 2 runs out of hearts, he sits out for 3 seconds and comes back next to player 1. The game is over only when player 1 runs out of hearts.
+- **Saves remember player 2.** His items and hearts are stored per save slot in `tmc.coop`; `tmc.sav` itself is unchanged. Quicksaves include player 2 too.
 
-| Version | Filename         | SHA1                                       |
-|---------|------------------|--------------------------------------------|
-| USA     | `baserom.gba`    | `b4bd50e4131b027c334547b4524e2dbbd4227130` |
-| EU      | `baserom_eu.gba` | `cff199b36ff173fb6faf152653d1bccf87c26fb7` |
-| JP      | `baserom_jp.gba` | `6c5404a1effb17f481f352181d0f1c61a2765c5d` |
+## Building
 
-Current release builds are multi-region: the same `tmc_pc` binary validates
-the loaded ROM by SHA-1 and selects USA, EU, or JP data at runtime. The
-filenames above are the easiest setup path.
+You need your own dump of *The Minish Cap* (USA). This repository contains no ROM and no data extracted from one.
 
-## Pre-built releases (recommended)
-
-Pre-built tarballs are published on the [Releases page](https://github.com/999sian/tmc/releases).
-Each tarball contains:
-
-```
-tmc_pc      sounds.json      assets/      assets_src/
-```
-
-The extracted asset cache under `assets/` (and the editable `assets_src/`) is keyed
-per region in a subfolder — `assets/usa/`, `assets/eu/`, `assets/jp/` — so running
-more than one regional ROM from the same install never mixes or corrupts another
-region's data. The cache for each region is built automatically on first launch of
-that ROM. `sounds.json` is shared across regions and stays at the top level.
-
-Setup, once:
-
-1. Download the platform tarball
-   (`tmc-*-{linux,windows,macos}-<version>.tar.gz`) and unpack it anywhere.
-2. Drop your own supported ROM next to the binary (`baserom.gba`,
-   `baserom_eu.gba`, or `baserom_jp.gba`).
-3. Run the game:
-
-   ```sh
-   ./tmc_pc                   # Linux / macOS
-   tmc_pc.exe                 # Windows (double-click works)
-   ```
-
-On first launch, the binary self-extracts the runtime asset cache (≈3–5 s,
-with a progress bar). Subsequent launches are instant. The binary resolves
-the ROM, `sounds.json`, and asset trees relative to its own location, so the
-install directory can live anywhere — no `cd` dance.
-
-## Build from source
-
-Place your ROM in the repository root, then run:
-
-```sh
-python3 build.py
+```bash
+python3 build.py --usa
 ```
 
-The script will:
-
-- Check and prompt to install missing dependencies (xmake, SDL3, libpng,
-  fmt, nlohmann-json)
-- Initialize git submodules automatically
-- Scan ROM files and verify checksums
-- Let you choose USA, EU, JP, or all configured versions
-- Compile the native multi-region binary for your platform
-- Place everything under `dist/<VERSION>/`
-
-Run the result:
-
-```sh
-cd dist/USA
-./tmc_pc
-```
-
-Saves are written to `tmc.sav` in the working directory, in the same byte
-order mGBA/VBA-M use — a Minish Cap `.sav` from those emulators can be dropped
-in as `tmc.sav` (and `tmc.sav` works in them, renamed to match the ROM).
-Saves created by older Picori builds are migrated automatically on first
-load; the original is kept as `tmc.sav.bak`.
-
-### Dependencies
-
-**Linux (Arch / CachyOS):**
-```sh
-sudo pacman -S xmake sdl3 libpng fmt nlohmann-json git curl
-```
-
-**Linux (Ubuntu / Debian):**
-```sh
-sudo apt install xmake libsdl3-dev libpng-dev libfmt-dev nlohmann-json3-dev libcurl4-openssl-dev git curl
-```
-
-**macOS (Apple Silicon or Intel):**
-```sh
-xcode-select --install                                                                            # Apple's compiler + git
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"   # Homebrew, if you don't have it
-brew install xmake pkg-config fmt nlohmann-json libpng libomp
-```
-
-What each piece does, in plain English:
-
-- **Xcode Command Line Tools** — Apple's C/C++ compiler (`clang`), linker, and
-  `git`. You can't build any native code on a Mac without them, and Homebrew
-  won't install them for you.
-- **Homebrew** — the package manager that fetches everything else. If you've
-  never used a Mac for development, this is the one prerequisite you'll
-  always end up installing.
-- **xmake** — the build system that drives the whole compile (think
-  `make`/`cmake`, but it auto-downloads any C/C++ libraries that aren't
-  already on your system).
-- **pkg-config** — a tiny tool xmake uses to ask "where did Homebrew put
-  libpng?". Without it, xmake can't find the brew-installed libraries and
-  will rebuild them itself (slow and sometimes broken).
-- **fmt** and **nlohmann-json** — small C++ helper libraries the asset tools
-  and game code use for text formatting and JSON parsing.
-- **libpng** — needed by the graphics tools to read and write PNG sprite
-  sheets.
-- **libomp** — Apple Clang doesn't ship with an OpenMP runtime, so VirtuaPPU's
-  parallel scanline renderer needs Homebrew's `libomp`. If it's missing, the
-  build still works but falls back to a single-threaded path.
-- **SDL3** — the cross-platform window/input/audio layer. Not in the brew
-  list because xmake builds its own copy automatically on macOS (the Linux
-  path uses the system one when available, but on macOS the bundled build
-  is the default and Just Works).
-
-**Windows:** Install [xmake](https://xmake.io) and [git](https://git-scm.com).
-SDL3 and other libraries are downloaded automatically by xmake.
-
-See [INSTALL.md](INSTALL.md) for slim builds, the `xmake build tmc_pc`
-single-target invocation, and other build options.
-
-## Tested platforms
-
-* Linux (Wayland preferred, X11 fallback)
-* Windows via MinGW static link
-* macOS (Apple Silicon and Intel) — builds cleanly with Homebrew + Xcode
-  Command Line Tools; lightly tested compared to Linux/Windows.
+The game ends up in `dist/USA/tmc_pc`. See [INSTALL.md](INSTALL.md) for dependencies and other platforms.
 
 ## Controls
 
-| Action                         | Keyboard         | Gamepad        |
-|--------------------------------|------------------|----------------|
-| Fast-forward (hold)            | Tab              | —              |
-| Soft reset to title            | A+B+Start+Select | A+B+Start+Select |
-| Toggle fullscreen              | F11 / Alt+Enter  | —              |
-| Cycle upscaler                 | F12              | —              |
-| Toggle text-to-speech          | F7               | —              |
-| Open debug menu                | F8               | —              |
-| Capture bug report             | F9               | —              |
-| Quicksave                      | F5               | —              |
-| Quickload (also stops speech)  | F6               | —              |
-| Roll attack macro              | D                | R3 (RS click)  |
+| Action | Player 1 (keyboard) | Player 2 (keyboard) |
+|---|---|---|
+| Move | arrow keys | I / J / K / L |
+| A (sword, action) | X | O |
+| B (item) | Z | U |
+| R (action, lift, roll) | S | H |
+| L (kinstones) | A | Y |
+| Start (menu) | Enter | N |
 
-Hold a direction, then press the roll-attack bind for a start-of-roll sword
-attack (uses your best sword regardless of A/B equip). Toggle in **F8 →
-Controls**. Rebindable there.
+- **Gamepads:** the first connected gamepad goes to player 1, the second to player 2. If player 1's gamepad is unplugged, player 2 keeps his. A gamepad plugged back in goes to the player without one.
+- **Joining:** player 2 joins when you press any of his keys or a button on his gamepad. If a game was saved with two players, player 2 comes back on his own when that save is loaded.
+- **Player 2's menu** (N key): choose his A/B items. His item buttons and hearts are shown at the top of the screen.
+- **Text boxes** can be advanced by either player.
 
-The **F8** debug menu also covers warp, items, heal, internal render scale,
-the renderer/shader toggles (see *Renderer & shaders*) and an Accessibility tab
-(see *Accessibility*).
+## Settings (`dist/USA/config.json`)
 
-Default upscaler is nearest-neighbor (sharp pixels). **F12** cycles through:
-nearest-raw → xBRZ 4× (linear, smooth) → xBRZ 4× (nearest, sharp) → linear-raw.
+| Key | Default | Effect |
+|---|---|---|
+| `coop_p2_join` | `true` | Player 2 joins when one of his keys is pressed. `false` prevents joining by accident |
+| `coop_shared_hearts` | `false` | `true`: one shared heart bar, as in single player |
+| `p2_gamepad` | `"auto"` | `"auto"`: the second gamepad belongs to player 2. `"first"`: the first (only) gamepad belongs to player 2 and player 1 uses the keyboard. `"none"`: player 2 uses the keyboard only |
+| `p2_bindings` | see the table above | Player 2's keys |
 
-The window title shows the running port version — please include it when
-filing issues.
+## Co-op test mode
 
-## Renderer & shaders
+Test mode jumps straight into a room to try a mechanic: enemies, buttons, portals, bosses. Pick a room with the buttons below **Play** on the launch screen, or from **F8 → Coop Test**. From a terminal:
 
-The default renderer is the vendored software PPU (`port/ppu`) presented through
-SDL. An optional **SDL_GPU** backend adds post-processing shader presets (CRT,
-LCD, scanline looks, …). In the **F8** menu:
-
-- **Renderer** toggles software ↔ GPU.
-- **CRT filter** cycles the stock CPU/GPU presentation filters.
-- **Shader Preset** picks a `.glslp` preset when the SPIR-V/Vulkan GPU backend is active.
-
-The GPU backend is compiled into the pre-built releases and `build.py` builds
-it by default. A bare `xmake` configure needs `--gpu_renderer=y` — without it
-the GPU options are present but show "GPU backend required". On macOS the GPU
-backend uses Metal for the stock filters; runtime `.glslp` shader presets still
-require the SPIR-V/Vulkan backend.
-
-## Accessibility
-
-The port has built-in text-to-speech for screen-reader users. Press **F7** to
-toggle it on or off; dialog text, figurine descriptions, file-select hints and
-other text surfaces are read aloud. While TTS is on, plain **F6** silences the
-current utterance, and the **F8 → Accessibility** tab has rate / pitch / volume
-sliders.
-
-The speech backend is selected automatically per platform:
-
-- **Windows** — the NVDA Controller Client if NVDA is running (using your
-  configured NVDA voice; the F8 sliders are ignored while NVDA owns the queue),
-  otherwise SAPI.
-- **Linux / macOS** — the first available of `spd-say`, `espeak-ng`, `espeak`,
-  or macOS `say`.
-
-See [CHANGELOG.md](CHANGELOG.md) for per-release notes.
-
-## Nix
-
-A `flake.nix` is provided with all dependencies. Run the port directly with:
-
-```sh
-nix run
+```bash
+cd dist/USA
+TMC_COOP_TEST=enemies ./tmc_pc
 ```
 
-Or enter a development shell:
+The presets are defined in `assets/coop_tests.json`.
 
-```sh
-nix develop
-```
+## Known limitations
 
-## Contributing
+- Shops, story-driven kinstone fusions, Minish portals, minecarts and clouds are led by player 1. Player 2 rides along or waits nearby.
+- Player 2 steps aside during minigames: Anju's cucco game and Borlov's chest game.
+- An NPC in conversation turns to player 1, even when player 2 started the talk.
+- Cheap keyboards drop some key presses when both players hold several keys at once. Gamepads work better.
+- Quicksaves from earlier versions of the port don't load in this version. Regular saves (`tmc.sav`) work.
 
-Issues and pull requests are welcome — port improvements, tools, and
-documentation. Open an issue describing the bug or proposed change before
-larger work so we can coordinate.
+## Credits and license
 
-## License
+- [999sian/tmc — Project Picori](https://github.com/999sian/tmc): the PC port this mod is built on.
+- [zeldaret/tmc](https://github.com/zeldaret/tmc): the decompilation of *The Minish Cap*.
+- [agbplay](https://github.com/ipatix/agbplay) and the other libraries listed in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 
-Project Picori is released under the **GNU General Public License v3.0
-(GPL-3.0)** — see [`LICENSE`](LICENSE). You are free to use, study, modify, and
-redistribute it; derivative works must remain under the GPL-3.0 and ship their
-source.
-
-The project as a whole is distributed under the GPL-3.0. Bundled, linked, and
-invoked third-party components keep their own (GPL-compatible) licenses — see
-[`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md) for the full list.
-Notably:
-
-- **agbplay** (`libs/agbplay_core`, derived from
-  https://github.com/ipatix/agbplay) is **LGPL-3.0**; those files remain under
-  the LGPL and the larger work is not relicensed by linking it.
-
-The in-game randomizer (`port/rando/`) uses a bundled `.logic` file and runs
-inside the PC port. It derives from GPL-3.0 work, as do the Reborn-parity QoL
-features. Both are distributed here under the GPL-3.0, with attribution in
-[`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md) and
-[`docs/reborn-parity.md`](docs/reborn-parity.md).
-
-This project also builds on the zeldaret/tmc decompilation of a copyrighted
-game. All Nintendo intellectual property remains owned by Nintendo; a
-legitimately-owned ROM is required.
+Licensed under GPL-3.0, like the port; see [LICENSE](LICENSE). *The Legend of Zelda* and *The Minish Cap* are trademarks of Nintendo. This project contains no ROM and no data taken from one.

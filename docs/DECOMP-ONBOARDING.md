@@ -6,7 +6,7 @@ C in `src/` is compiled into two very different binaries, and the code does not
 read like normal application code. Read this before touching `src/`.
 
 For the PC port layer (`port/`), GBA→PC bug classes, and submission rules, see
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`AGENTS.md`](../AGENTS.md) — this
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) — this
 doc deliberately does not duplicate them.
 
 ---
@@ -232,7 +232,7 @@ xmake f -y --game_version=USA
 xmake build -y tmc_pc
 ```
 
-**Headless smoke test** (the minimum bar from `AGENTS.md` — must reach the
+**Headless smoke test** (the minimum bar — must reach the
 `Entering AgbMain...` line):
 
 ```bash
@@ -240,7 +240,7 @@ TMC_AUTOPLAY=1 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./dist/USA/tmc_pc --n
 ```
 
 A successful launch prints `Port layer initialized. Entering AgbMain...`. There
-is **no automated test suite** (`AGENTS.md`, `CONTRIBUTING.md`); verification is
+is **no automated test suite** (`CONTRIBUTING.md`); verification is
 the smoke run plus interactive play via the **F8** warp/debug menu and **F9**
 repro capture.
 
@@ -268,8 +268,6 @@ A ROM is required at the repo root for asset extraction / full runtime (USA
   pointers, NULL/OOB reads, raw-address derefs), the `#ifdef PC_PORT`
   convention, the full PC-port module map, and the upstream decompilation
   pointer.
-- **`AGENTS.md`** — architecture & data flow, key directories/files, the full
-  command list, conventions, and the testing/QA expectations.
 - **`port/rando/README.md`** — the best-documented subsystem; read it before
   touching the randomizer (and as a model for how a port subsystem is structured).
 - **Upstream [zeldaret/tmc](https://github.com/zeldaret/tmc)** — where

@@ -2,7 +2,7 @@
 
 ## Picori Co-op v0.1.0 (2026-10-08)
 
-Local two-player co-op on top of port v0.9.5. See [README-COOP.md](README-COOP.md).
+Local two-player co-op on top of port v0.9.5. See [README.md](README.md).
 
 - A second Link joins with its own keys (I/J/K/L, O, U, H, Y, N) or the second
   gamepad. It has its own A/B items, chosen in its own pause menu, and its own

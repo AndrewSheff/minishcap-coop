@@ -1,7 +1,7 @@
 /*
  * port_android_log.c — route stdout/stderr into logcat on Android.
  *
- * The whole port logs with fprintf(stderr, ...) (AGENTS.md convention), which
+ * The whole port logs with fprintf(stderr, ...) (project convention), which
  * Android silently discards: an app's fd 1/2 point at /dev/null. This bridge
  * dup2()s both onto a pipe and pumps complete lines into
  * __android_log_write(tag "tmc"), so `adb logcat -s tmc` shows exactly what a

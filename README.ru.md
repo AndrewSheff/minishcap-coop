@@ -1,5 +1,7 @@
 # Picori Co-op — локальный кооператив для Minish Cap
 
+[English version](README.md)
+
 Мод для [Project Picori](https://github.com/999sian/tmc), PC-порта *The Legend of Zelda: The Minish Cap*. Добавляет второго Линка на том же компьютере: два игрока проходят всю игру вместе, на одном экране, с клавиатуры или геймпадов.
 
 Версия: **v0.1.0** (порт 0.9.5). Номер виден в заголовке окна.
@@ -76,18 +78,3 @@ TMC_COOP_TEST=enemies ./tmc_pc
 
 Код распространяется под той же лицензией, что и порт: GPL-3.0, см. [LICENSE](LICENSE). *The Legend of Zelda* и *The Minish Cap* принадлежат Nintendo. Мод не содержит ROM и данных из него.
 
----
-
-## English
-
-**Picori Co-op** adds local two-player co-op to [Project Picori](https://github.com/999sian/tmc), a PC port of *The Legend of Zelda: The Minish Cap*. A second Link plays the whole game alongside the first on one screen. Each Link has his own A/B items and hearts (hearts can be shared). The camera keeps both Links in view. Player 1 drives room transitions, cutscenes, shops and portals.
-
-- **Build:** bring your own USA ROM, run `python3 build.py --usa`, then start `dist/USA/tmc_pc`.
-- **Player 1 keys:** arrows, X = A, Z = B, S = R, A = L, Enter = Start.
-- **Player 2 keys:** I/J/K/L, O = A, U = B, H = R, Y = L, N = Start (opens player 2's item menu).
-- **Gamepads:** the second pad belongs to player 2. Pads keep their player when one is unplugged.
-- **Joining:** player 2 joins by pressing any of its keys. A save made with two players brings player 2 back on load.
-- **Config (`config.json`):** `coop_p2_join`, `coop_shared_hearts`, `p2_gamepad` (`auto` / `first` / `none`), `p2_bindings`.
-- **Test mode:** `TMC_COOP_TEST=<preset> ./tmc_pc`, or use the buttons on the launch screen.
-
-Licensed under GPL-3.0 like the port it builds on. Credits: 999sian/tmc (Project Picori), zeldaret/tmc. No ROM or ROM-derived data is included.

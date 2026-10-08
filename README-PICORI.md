@@ -1,0 +1,257 @@
+<p align="center">
+  <img src="docs/picori-logo.png" alt="Project Picori" width="240">
+</p>
+
+# Project Picori — Minish Cap PC Port
+
+A native PC port of *The Legend of Zelda: The Minish Cap* (GBA, 2004) built on
+SDL3, a vendored software PPU renderer (`port/ppu`), and the agbplay audio engine.
+Targets **x86-64 Linux, Windows, and macOS** (Apple Silicon and Intel).
+
+The port is **work in progress** — many rendering and gameplay paths are still
+rough; please file issues for anything that breaks.
+
+## Supported ROMs
+
+A copy of the original game is required. This repository does **not** ship ROMs.
+
+| Version | Filename         | SHA1                                       |
+|---------|------------------|--------------------------------------------|
+| USA     | `baserom.gba`    | `b4bd50e4131b027c334547b4524e2dbbd4227130` |
+| EU      | `baserom_eu.gba` | `cff199b36ff173fb6faf152653d1bccf87c26fb7` |
+| JP      | `baserom_jp.gba` | `6c5404a1effb17f481f352181d0f1c61a2765c5d` |
+
+Current release builds are multi-region: the same `tmc_pc` binary validates
+the loaded ROM by SHA-1 and selects USA, EU, or JP data at runtime. The
+filenames above are the easiest setup path.
+
+## Pre-built releases (recommended)
+
+Pre-built tarballs are published on the [Releases page](https://github.com/999sian/tmc/releases).
+Each tarball contains:
+
+```
+tmc_pc      sounds.json      assets/      assets_src/
+```
+
+The extracted asset cache under `assets/` (and the editable `assets_src/`) is keyed
+per region in a subfolder — `assets/usa/`, `assets/eu/`, `assets/jp/` — so running
+more than one regional ROM from the same install never mixes or corrupts another
+region's data. The cache for each region is built automatically on first launch of
+that ROM. `sounds.json` is shared across regions and stays at the top level.
+
+Setup, once:
+
+1. Download the platform tarball
+   (`tmc-*-{linux,windows,macos}-<version>.tar.gz`) and unpack it anywhere.
+2. Drop your own supported ROM next to the binary (`baserom.gba`,
+   `baserom_eu.gba`, or `baserom_jp.gba`).
+3. Run the game:
+
+   ```sh
+   ./tmc_pc                   # Linux / macOS
+   tmc_pc.exe                 # Windows (double-click works)
+   ```
+
+On first launch, the binary self-extracts the runtime asset cache (≈3–5 s,
+with a progress bar). Subsequent launches are instant. The binary resolves
+the ROM, `sounds.json`, and asset trees relative to its own location, so the
+install directory can live anywhere — no `cd` dance.
+
+## Build from source
+
+Place your ROM in the repository root, then run:
+
+```sh
+python3 build.py
+```
+
+The script will:
+
+- Check and prompt to install missing dependencies (xmake, SDL3, libpng,
+  fmt, nlohmann-json)
+- Initialize git submodules automatically
+- Scan ROM files and verify checksums
+- Let you choose USA, EU, JP, or all configured versions
+- Compile the native multi-region binary for your platform
+- Place everything under `dist/<VERSION>/`
+
+Run the result:
+
+```sh
+cd dist/USA
+./tmc_pc
+```
+
+Saves are written to `tmc.sav` in the working directory, in the same byte
+order mGBA/VBA-M use — a Minish Cap `.sav` from those emulators can be dropped
+in as `tmc.sav` (and `tmc.sav` works in them, renamed to match the ROM).
+Saves created by older Picori builds are migrated automatically on first
+load; the original is kept as `tmc.sav.bak`.
+
+### Dependencies
+
+**Linux (Arch / CachyOS):**
+```sh
+sudo pacman -S xmake sdl3 libpng fmt nlohmann-json git curl
+```
+
+**Linux (Ubuntu / Debian):**
+```sh
+sudo apt install xmake libsdl3-dev libpng-dev libfmt-dev nlohmann-json3-dev libcurl4-openssl-dev git curl
+```
+
+**macOS (Apple Silicon or Intel):**
+```sh
+xcode-select --install                                                                            # Apple's compiler + git
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"   # Homebrew, if you don't have it
+brew install xmake pkg-config fmt nlohmann-json libpng libomp
+```
+
+What each piece does, in plain English:
+
+- **Xcode Command Line Tools** — Apple's C/C++ compiler (`clang`), linker, and
+  `git`. You can't build any native code on a Mac without them, and Homebrew
+  won't install them for you.
+- **Homebrew** — the package manager that fetches everything else. If you've
+  never used a Mac for development, this is the one prerequisite you'll
+  always end up installing.
+- **xmake** — the build system that drives the whole compile (think
+  `make`/`cmake`, but it auto-downloads any C/C++ libraries that aren't
+  already on your system).
+- **pkg-config** — a tiny tool xmake uses to ask "where did Homebrew put
+  libpng?". Without it, xmake can't find the brew-installed libraries and
+  will rebuild them itself (slow and sometimes broken).
+- **fmt** and **nlohmann-json** — small C++ helper libraries the asset tools
+  and game code use for text formatting and JSON parsing.
+- **libpng** — needed by the graphics tools to read and write PNG sprite
+  sheets.
+- **libomp** — Apple Clang doesn't ship with an OpenMP runtime, so VirtuaPPU's
+  parallel scanline renderer needs Homebrew's `libomp`. If it's missing, the
+  build still works but falls back to a single-threaded path.
+- **SDL3** — the cross-platform window/input/audio layer. Not in the brew
+  list because xmake builds its own copy automatically on macOS (the Linux
+  path uses the system one when available, but on macOS the bundled build
+  is the default and Just Works).
+
+**Windows:** Install [xmake](https://xmake.io) and [git](https://git-scm.com).
+SDL3 and other libraries are downloaded automatically by xmake.
+
+See [INSTALL.md](INSTALL.md) for slim builds, the `xmake build tmc_pc`
+single-target invocation, and other build options.
+
+## Tested platforms
+
+* Linux (Wayland preferred, X11 fallback)
+* Windows via MinGW static link
+* macOS (Apple Silicon and Intel) — builds cleanly with Homebrew + Xcode
+  Command Line Tools; lightly tested compared to Linux/Windows.
+
+## Controls
+
+| Action                         | Keyboard         | Gamepad        |
+|--------------------------------|------------------|----------------|
+| Fast-forward (hold)            | Tab              | —              |
+| Soft reset to title            | A+B+Start+Select | A+B+Start+Select |
+| Toggle fullscreen              | F11 / Alt+Enter  | —              |
+| Cycle upscaler                 | F12              | —              |
+| Toggle text-to-speech          | F7               | —              |
+| Open debug menu                | F8               | —              |
+| Capture bug report             | F9               | —              |
+| Quicksave                      | F5               | —              |
+| Quickload (also stops speech)  | F6               | —              |
+| Roll attack macro              | D                | R3 (RS click)  |
+
+Hold a direction, then press the roll-attack bind for a start-of-roll sword
+attack (uses your best sword regardless of A/B equip). Toggle in **F8 →
+Controls**. Rebindable there.
+
+The **F8** debug menu also covers warp, items, heal, internal render scale,
+the renderer/shader toggles (see *Renderer & shaders*) and an Accessibility tab
+(see *Accessibility*).
+
+Default upscaler is nearest-neighbor (sharp pixels). **F12** cycles through:
+nearest-raw → xBRZ 4× (linear, smooth) → xBRZ 4× (nearest, sharp) → linear-raw.
+
+The window title shows the running port version — please include it when
+filing issues.
+
+## Renderer & shaders
+
+The default renderer is the vendored software PPU (`port/ppu`) presented through
+SDL. An optional **SDL_GPU** backend adds post-processing shader presets (CRT,
+LCD, scanline looks, …). In the **F8** menu:
+
+- **Renderer** toggles software ↔ GPU.
+- **CRT filter** cycles the stock CPU/GPU presentation filters.
+- **Shader Preset** picks a `.glslp` preset when the SPIR-V/Vulkan GPU backend is active.
+
+The GPU backend is compiled into the pre-built releases and `build.py` builds
+it by default. A bare `xmake` configure needs `--gpu_renderer=y` — without it
+the GPU options are present but show "GPU backend required". On macOS the GPU
+backend uses Metal for the stock filters; runtime `.glslp` shader presets still
+require the SPIR-V/Vulkan backend.
+
+## Accessibility
+
+The port has built-in text-to-speech for screen-reader users. Press **F7** to
+toggle it on or off; dialog text, figurine descriptions, file-select hints and
+other text surfaces are read aloud. While TTS is on, plain **F6** silences the
+current utterance, and the **F8 → Accessibility** tab has rate / pitch / volume
+sliders.
+
+The speech backend is selected automatically per platform:
+
+- **Windows** — the NVDA Controller Client if NVDA is running (using your
+  configured NVDA voice; the F8 sliders are ignored while NVDA owns the queue),
+  otherwise SAPI.
+- **Linux / macOS** — the first available of `spd-say`, `espeak-ng`, `espeak`,
+  or macOS `say`.
+
+See [CHANGELOG.md](CHANGELOG.md) for per-release notes.
+
+## Nix
+
+A `flake.nix` is provided with all dependencies. Run the port directly with:
+
+```sh
+nix run
+```
+
+Or enter a development shell:
+
+```sh
+nix develop
+```
+
+## Contributing
+
+Issues and pull requests are welcome — port improvements, tools, and
+documentation. Open an issue describing the bug or proposed change before
+larger work so we can coordinate.
+
+## License
+
+Project Picori is released under the **GNU General Public License v3.0
+(GPL-3.0)** — see [`LICENSE`](LICENSE). You are free to use, study, modify, and
+redistribute it; derivative works must remain under the GPL-3.0 and ship their
+source.
+
+The project as a whole is distributed under the GPL-3.0. Bundled, linked, and
+invoked third-party components keep their own (GPL-compatible) licenses — see
+[`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md) for the full list.
+Notably:
+
+- **agbplay** (`libs/agbplay_core`, derived from
+  https://github.com/ipatix/agbplay) is **LGPL-3.0**; those files remain under
+  the LGPL and the larger work is not relicensed by linking it.
+
+The in-game randomizer (`port/rando/`) uses a bundled `.logic` file and runs
+inside the PC port. It derives from GPL-3.0 work, as do the Reborn-parity QoL
+features. Both are distributed here under the GPL-3.0, with attribution in
+[`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md) and
+[`docs/reborn-parity.md`](docs/reborn-parity.md).
+
+This project also builds on the zeldaret/tmc decompilation of a copyrighted
+game. All Nintendo intellectual property remains owned by Nintendo; a
+legitimately-owned ROM is required.

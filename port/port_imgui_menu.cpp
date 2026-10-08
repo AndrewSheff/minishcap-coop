@@ -1750,7 +1750,7 @@ extern "C" bool Port_ImGui_RenderPrelaunch(bool rom_present, const char* version
             ImGui::Separator();
             ImGui::Dummy(ImVec2(0, 6));
             ImGui::PushStyleColor(ImGuiCol_Text, accent);
-            CenteredText("Кооп-тест: сразу в комнату");
+            CenteredText("Co-op test: jump straight into a room");
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 4));
             for (int i = 0; i < Port_CoopTest_PresetCount(); ++i) {
